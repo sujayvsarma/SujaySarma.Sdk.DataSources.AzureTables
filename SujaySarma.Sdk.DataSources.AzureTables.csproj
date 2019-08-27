@@ -1,0 +1,64 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.0</TargetFramework>
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);CopyProjectReferencesToPackage</TargetsForTfmSpecificBuildOutput>
+    <LangVersion>8.0</LangVersion>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <Authors>Sujay V Sarma</Authors>
+    <Company>Sujay V Sarma</Company>
+    <Description>Easily add the ability to store data in Azure Storage's Table Service. Also works with CosmosDB when it is used in Tables API mode. Simply decorate your business objects and its properties with the provided attributes and store and retrieve data with Azure Table Storage using ONE line of code!</Description>
+    <Copyright>Copyright © 2019 Sujay V. Sarma. All Rights Reserved.</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/sujayvsarma/SujaySarma-Sdk/</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/sujayvsarma/SujaySarma-Sdk/</RepositoryUrl>
+    <RepositoryType>Git</RepositoryType>
+    <PackageTags>orm,data,azure,azure tables,cosmosdb,sql server</PackageTags>
+    <Version>1.1</Version>
+    <PackageReleaseNotes>There are no major improvements in code. The backing code repositories were re-arranged for CI-reasons. This has resulted in fewer dependencies and some namespaces changes (for example, there is no longer an SujaySarma.Sdk.ObjectMapper)</PackageReleaseNotes>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <GenerateSerializationAssemblies>Off</GenerateSerializationAssemblies>
+    <CodeAnalysisRuleSet />
+    <WarningsAsErrors>NU1605</WarningsAsErrors>
+    <NoWarn>1701;1702;NU5104</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <CodeAnalysisRuleSet />
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="SujaySarma.Sdk.Core\**" />
+    <EmbeddedResource Remove="SujaySarma.Sdk.Core\**" />
+    <None Remove="SujaySarma.Sdk.Core\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove=".gitignore" />
+    <None Remove=".gitmodules" />
+    <None Remove="LICENSE" />
+    <None Remove="README.md" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Azure.Cosmos.Table" Version="1.0.1" />
+    <PackageReference Include="Microsoft.Azure.DocumentDB.Core" Version="2.1.3" />
+    <PackageReference Include="System.Net.NameResolution" Version="4.3.0" />
+    <PackageReference Include="System.Security.Principal.Windows" Version="4.5.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="SujaySarma.Sdk.Core\SujaySarma.Sdk.Core.csproj" />
+  </ItemGroup>
+
+  <Target Name="CopyProjectReferencesToPackage" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths-&gt;WithMetadataValue('ReferenceSourceTarget', 'ProjectReference'))" />
+    </ItemGroup>
+  </Target>
+
+</Project>

@@ -1,0 +1,3 @@
+[submodule "SujaySarma.Sdk.Core"]
+	path = SujaySarma.Sdk.Core
+	url = https://github.com/sujayvsarma/SujaySarma.Sdk.Core
