@@ -5,7 +5,7 @@ VisualStudioVersion = 16.0.29209.152
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SujaySarma.Sdk.DataSources.AzureTables", "SujaySarma.Sdk.DataSources.AzureTables.csproj", "{681CACC1-2DBA-4062-B403-AD36DAF3723F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SujaySarma.Sdk.Core", "SujaySarma.Sdk.Core\SujaySarma.Sdk.Core.csproj", "{56BB8CD0-1E4E-4150-9F80-32E31ADDBC24}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SujaySarma.Sdk.Core", "..\SujaySarma.Sdk.Core\SujaySarma.Sdk.Core.csproj", "{56BB8CD0-1E4E-4150-9F80-32E31ADDBC24}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
