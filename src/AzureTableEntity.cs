@@ -28,7 +28,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             get => _partitionKey;
             set
             {
-                if (! TableKeyValidator.IsValid(value))
+                if (!TableKeyValidator.IsValid(value))
                 {
                     throw new ArgumentException(nameof(PartitionKey));
                 }
@@ -184,10 +184,14 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
 
             AzureTableEntity entity = new AzureTableEntity();
 
-            ObjectMetadataInfo objectInfo = TypeInspector.GetObjectMetadataInfo<T>();
+            ClassInfo objectInfo = TypeInspector.InspectOnlyIfAnotated<T, TableAttribute>();
+            if (objectInfo == null)
+            {
+                throw new TypeLoadException($"Type '{typeof(T).FullName}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute.");
+            }
 
             bool hasPartitionKey = false, hasRowKey = false;
-            foreach (PropertyFieldMetadataInfo propertyInfo in objectInfo.PropertiesAndFields)
+            foreach (PropertyInfo propertyInfo in objectInfo.Properties)
             {
                 bool isPartitionKey = false, isRowKey = false;
                 string entityPropertyName = null;
@@ -297,6 +301,115 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                 }
             }
 
+            foreach (FieldInfo fieldInfo in objectInfo.Fields)
+            {
+                bool isPartitionKey = false, isRowKey = false;
+                string entityPropertyName = null;
+                object value = null;
+
+                foreach (Attribute attribute in fieldInfo.CustomAttributes)
+                {
+                    switch (attribute)
+                    {
+                        case PartitionKeyAttribute pk:
+                            {
+                                if (hasPartitionKey)
+                                {
+                                    throw new TypeLoadException($"Object '{objectInfo.FullyQualifiedName}' contains multiple partition key definitions.");
+                                }
+
+                                isPartitionKey = true;
+                                value = fieldInfo.Read(instance);
+                                break;
+                            }
+
+                        case RowKeyAttribute rk:
+                            {
+                                if (hasRowKey)
+                                {
+                                    throw new TypeLoadException($"Object '{objectInfo.FullyQualifiedName}' contains multiple row key definitions.");
+                                }
+
+                                isRowKey = true;
+                                value = fieldInfo.Read(instance);
+                                break;
+                            }
+
+                        case TableColumnAttribute tc:
+                            {
+                                if (!IsEdmCompatibleType(fieldInfo.Type))
+                                {
+                                    try
+                                    {
+                                        // try serializing to Json?
+                                        value = Newtonsoft.Json.JsonConvert.SerializeObject(fieldInfo.Read(instance));
+                                    }
+                                    catch
+                                    {
+                                        throw new TypeLoadException($"The type '{fieldInfo.Type.FullName}' for '{objectInfo.ClassName}.{fieldInfo.MemberName}' is not an Edm type usable with Azure Tables.");
+                                    }
+                                }
+                                else
+                                {
+                                    value = fieldInfo.Read(instance);
+                                }
+
+                                entityPropertyName = tc.ColumnName;
+                                break;
+                            }
+                    }
+                }
+
+                if (isPartitionKey)
+                {
+                    if (value == null)
+                    {
+                        throw new Exception("PartitionKey must be NON NULL.");
+                    }
+
+                    string pkValue = value.ToString();
+                    if (fieldInfo.Type != typeof(string))
+                    {
+                        TypeConverter pkc = TypeDescriptor.GetConverter(fieldInfo.Type);
+                        if ((pkc == null) || (!pkc.CanConvertTo(typeof(string))))
+                        {
+                            throw new TypeLoadException($"The type '{objectInfo.FullyQualifiedName}.{fieldInfo.MemberName}' cannot be converted to a string equivalent.");
+                        }
+                        pkValue = pkc.ConvertToString(value);
+                    }
+
+                    entity.PartitionKey = pkValue;
+                    hasPartitionKey = true;
+                }
+
+                if (isRowKey)
+                {
+                    if (value == null)
+                    {
+                        throw new Exception("RowKey must be NON NULL.");
+                    }
+
+                    string rkValue = value.ToString();
+                    if (fieldInfo.Type != typeof(string))
+                    {
+                        TypeConverter pkc = TypeDescriptor.GetConverter(fieldInfo.Type);
+                        if ((pkc == null) || (!pkc.CanConvertTo(typeof(string))))
+                        {
+                            throw new TypeLoadException($"The type '{objectInfo.FullyQualifiedName}.{fieldInfo.MemberName}' cannot be converted to a string equivalent.");
+                        }
+
+                        rkValue = pkc.ConvertToString(value);
+                    }
+
+                    entity.RowKey = rkValue;
+                    hasRowKey = true;
+                }
+
+                if (entityPropertyName != null)
+                {
+                    entity.AddOrUpdateProperty(entityPropertyName, value);
+                }
+            }
             return entity;
         }
 
@@ -355,49 +468,211 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             }
 
             T instance = new T();
-            ObjectMetadataInfo objectInfo = TypeInspector.GetObjectMetadataInfo<T>();
-            foreach (PropertyFieldMetadataInfo propertyInfo in objectInfo.PropertiesAndFields)
+
+            ClassInfo objectInfo = TypeInspector.InspectOnlyIfAnotated<T, TableAttribute>();
+            if (objectInfo == null)
+            {
+                throw new TypeLoadException($"Type '{typeof(T).FullName}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute.");
+            }
+
+            foreach (PropertyInfo propertyInfo in objectInfo.Properties)
             {
                 foreach (Attribute attribute in propertyInfo.CustomAttributes)
                 {
-                    switch (attribute)
+                    if (attribute is PartitionKeyAttribute)
                     {
-                        case PartitionKeyAttribute pk:
-                            {
-                                propertyInfo.Write(ref instance, PartitionKey);
+                        propertyInfo.Write(instance, PartitionKey);
+                    }
+                    else if (attribute is RowKeyAttribute)
+                    {
+                        propertyInfo.Write(instance, RowKey);
+                    }
+                    else if (attribute is TableColumnAttribute tc)
+                    {
+                        object value;
+                        switch (tc.ColumnName)
+                        {
+                            case "ETag":
+                                value = ETag;
                                 break;
-                            }
 
-                        case RowKeyAttribute rk:
-                            {
-                                propertyInfo.Write(ref instance, RowKey);
+                            case "Timestamp":
+                                value = Timestamp.UtcDateTime;
                                 break;
-                            }
 
-                        case TableColumnAttribute tc:
+                            case "PartitionKey":
+                                value = PartitionKey;
+                                break;
+
+                            case "RowKey":
+                                value = RowKey;
+                                break;
+
+                            default:
+                                value = GetPropertyValue(tc.ColumnName, default);
+                                if (propertyInfo.Type == typeof(DateTime))
+                                {
+                                    if (value == null)
+                                    {
+                                        value = DateTime.MinValue;
+                                    }
+
+                                    // Azure stores dt in UTC, change it back
+                                    value = ((DateTime)value).ToLocalTime();
+                                }
+                                else if (propertyInfo.Type == typeof(DateTime?))
+                                {
+                                    if (value != null)
+                                    {
+                                        // Azure stores dt in UTC, change it back
+                                        value = ((DateTime?)value).Value.ToLocalTime();
+                                    }
+                                }
+                                break;
+                        }
+
+                        try
+                        {
+                            propertyInfo.Write(instance, value);
+                        }
+                        catch
+                        {
+                            // try deserializing
+                            propertyInfo.Write(instance, JsonSerializer.Deserialize(value as string, propertyInfo.Type));
+                        }
+                    }
+                }
+            }
+
+            foreach (FieldInfo fieldInfo in objectInfo.Fields)
+            {
+                foreach (Attribute attribute in fieldInfo.CustomAttributes)
+                {
+                    if (attribute is PartitionKeyAttribute)
+                    {
+                        fieldInfo.Write(instance, PartitionKey);
+                    }
+                    else if (attribute is RowKeyAttribute)
+                    {
+                        fieldInfo.Write(instance, RowKey);
+                    }
+                    else if (attribute is TableColumnAttribute tc)
+                    {
+                        object value;
+                        switch (tc.ColumnName)
+                        {
+                            case "ETag":
+                                value = ETag;
+                                break;
+
+                            case "Timestamp":
+                                value = Timestamp.UtcDateTime;
+                                break;
+
+                            case "PartitionKey":
+                                value = PartitionKey;
+                                break;
+
+                            case "RowKey":
+                                value = RowKey;
+                                break;
+
+                            default:
+                                value = GetPropertyValue(tc.ColumnName, default);
+                                if (fieldInfo.Type == typeof(DateTime))
+                                {
+                                    if (value == null)
+                                    {
+                                        value = DateTime.MinValue;
+                                    }
+
+                                    // Azure stores dt in UTC, change it back
+                                    value = ((DateTime)value).ToLocalTime();
+                                }
+                                else if (fieldInfo.Type == typeof(DateTime?))
+                                {
+                                    if (value != null)
+                                    {
+                                        // Azure stores dt in UTC, change it back
+                                        value = ((DateTime?)value).Value.ToLocalTime();
+                                    }
+                                }
+                                break;
+                        }
+
+                        try
+                        {
+                            fieldInfo.Write(instance, value);
+                        }
+                        catch
+                        {
+                            // try deserializing
+                            fieldInfo.Write(instance, JsonSerializer.Deserialize(value as string, fieldInfo.Type));
+                        }
+                        break;
+                    }
+                }
+            }
+
+            return instance;
+        }
+
+        /// <summary>
+        /// Converts the provided list of table entity records to a list of business objects
+        /// </summary>
+        /// <typeparam name="T">Type of the business object instance</typeparam>
+        /// <param name="records">AzureTableEntity records to process</param>
+        /// <returns>List of business objects. An empty list if records were empty</returns>
+        public static List<T> ToList<T>(List<AzureTableEntity> records)
+            where T : class, new()
+        {
+            ClassInfo objectInfo = TypeInspector.InspectOnlyIfAnotated<T, TableAttribute>();
+            if (objectInfo == null)
+            {
+                throw new TypeLoadException($"Type '{typeof(T).FullName}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute.");
+            }
+
+            List<T> list = new List<T>();
+            if ((records != null) && (records.Count > 0))
+            {
+                foreach (AzureTableEntity tableEntity in records)
+                {
+                    T instance = new T();
+                    foreach (PropertyInfo propertyInfo in objectInfo.Properties)
+                    {
+                        foreach (Attribute attribute in propertyInfo.CustomAttributes)
+                        {
+                            if (attribute is PartitionKeyAttribute)
                             {
-                                object value = default;
-
+                                propertyInfo.Write(instance, tableEntity.PartitionKey);
+                            }
+                            else if (attribute is RowKeyAttribute)
+                            {
+                                propertyInfo.Write(instance, tableEntity.RowKey);
+                            }
+                            else if (attribute is TableColumnAttribute tc)
+                            {
+                                object value;
                                 switch (tc.ColumnName)
                                 {
                                     case "ETag":
-                                        value = ETag;
+                                        value = tableEntity.ETag;
                                         break;
 
                                     case "Timestamp":
-                                        value = Timestamp.UtcDateTime;
+                                        value = tableEntity.Timestamp.UtcDateTime;
                                         break;
 
                                     case "PartitionKey":
-                                        value = PartitionKey;
+                                        value = tableEntity.PartitionKey;
                                         break;
 
                                     case "RowKey":
-                                        value = RowKey;
+                                        value = tableEntity.RowKey;
                                         break;
 
                                     default:
-                                        value = GetPropertyValue(tc.ColumnName, default);
+                                        value = tableEntity.GetPropertyValue(tc.ColumnName, default);
                                         if (propertyInfo.Type == typeof(DateTime))
                                         {
                                             if (value == null)
@@ -421,38 +696,89 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
 
                                 try
                                 {
-                                    propertyInfo.Write(ref instance, value);
+                                    propertyInfo.Write(instance, value);
                                 }
                                 catch
                                 {
                                     // try deserializing
-                                    propertyInfo.Write(ref instance, JsonSerializer.Deserialize(value as string, propertyInfo.Type));
+                                    propertyInfo.Write(instance, JsonSerializer.Deserialize(value as string, propertyInfo.Type));
                                 }
                                 break;
                             }
+                        }
                     }
-                }
-            }
 
-            return instance;
-        }
+                    foreach (FieldInfo fieldInfo in objectInfo.Fields)
+                    {
+                        foreach (Attribute attribute in fieldInfo.CustomAttributes)
+                        {
+                            if (attribute is PartitionKeyAttribute)
+                            {
+                                fieldInfo.Write(instance, tableEntity.PartitionKey);
+                            }
+                            else if (attribute is RowKeyAttribute)
+                            {
+                                fieldInfo.Write(instance, tableEntity.RowKey);
+                            }
+                            else if (attribute is TableColumnAttribute tc)
+                            {
+                                object value;
+                                switch (tc.ColumnName)
+                                {
+                                    case "ETag":
+                                        value = tableEntity.ETag;
+                                        break;
 
-        /// <summary>
-        /// Converts the provided list of table entity records to a list of business objects
-        /// </summary>
-        /// <typeparam name="T">Type of the business object instance</typeparam>
-        /// <param name="records">AzureTableEntity records to process</param>
-        /// <returns>List of business objects. An empty list if records were empty</returns>
-        public static List<T> ToList<T>(List<AzureTableEntity> records)
-            where T : class, new()
-        {
-            List<T> list = new List<T>();
+                                    case "Timestamp":
+                                        value = tableEntity.Timestamp.UtcDateTime;
+                                        break;
 
-            if ((records != null) && (records.Count > 0))
-            {
-                foreach (AzureTableEntity tableEntity in records)
-                {
-                    list.Add(tableEntity.To<T>());
+                                    case "PartitionKey":
+                                        value = tableEntity.PartitionKey;
+                                        break;
+
+                                    case "RowKey":
+                                        value = tableEntity.RowKey;
+                                        break;
+
+                                    default:
+                                        value = tableEntity.GetPropertyValue(tc.ColumnName, default);
+                                        if (fieldInfo.Type == typeof(DateTime))
+                                        {
+                                            if (value == null)
+                                            {
+                                                value = DateTime.MinValue;
+                                            }
+
+                                            // Azure stores dt in UTC, change it back
+                                            value = ((DateTime)value).ToLocalTime();
+                                        }
+                                        else if (fieldInfo.Type == typeof(DateTime?))
+                                        {
+                                            if (value != null)
+                                            {
+                                                // Azure stores dt in UTC, change it back
+                                                value = ((DateTime?)value).Value.ToLocalTime();
+                                            }
+                                        }
+                                        break;
+                                }
+
+                                try
+                                {
+                                    fieldInfo.Write(instance, value);
+                                }
+                                catch
+                                {
+                                    // try deserializing
+                                    fieldInfo.Write(instance, JsonSerializer.Deserialize(value as string, fieldInfo.Type));
+                                }
+                                break;
+                            }
+                        }
+                    }
+
+                    list.Add(instance);
                 }
             }
 

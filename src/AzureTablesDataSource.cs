@@ -1,4 +1,5 @@
 ﻿using Microsoft.Azure.Cosmos.Table;
+
 using SujaySarma.Sdk.Core.Reflection;
 using SujaySarma.Sdk.DataSources.AzureTables.Attributes;
 
@@ -232,18 +233,16 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             if (objects != null)
             {
                 // we need to check if we are soft-deleting!
-                ObjectMetadataInfo objectInfo = TypeInspector.GetObjectMetadataInfo<T>();
-                foreach (Attribute attribute in objectInfo.CustomAttributes)
+                ClassInfo objectInfo = TypeInspector.InspectOnlyIfAnotated<T, TableAttribute>();
+                if (objectInfo == null)
                 {
-                    if (attribute is TableAttribute ta)
-                    {
-                        if (ta.UseSoftDelete)
-                        {
-                            return UpdateInternal(objects, true);
-                        }
+                    throw new TypeLoadException($"Type '{typeof(T).FullName}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute.");
+                }
 
-                        break;
-                    }
+                TableAttribute tableAttribute = objectInfo.GetAttributes<TableAttribute>().ToArray()[0];
+                if (tableAttribute.UseSoftDelete)
+                {
+                    return UpdateInternal(objects, true);
                 }
 
                 TableBatchOperation delete = new TableBatchOperation();
@@ -383,40 +382,25 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// </summary>
         /// <typeparam name="T">Class type of the business object</typeparam>
         /// <returns>Name of the table</returns>
-        public static string GetTableName<T>() where T : class => GetTableName(typeof(T));
-
-        /// <summary>
-        /// Get the name of the table for the object
-        /// </summary>
-        /// <param name="type">Class type of the business object</param>
-        /// <returns>Name of the table</returns>
-        public static string GetTableName(Type type)
+        public static string GetTableName<T>() where T : class
         {
-            ObjectMetadataInfo objectInfo = TypeInspector.GetObjectMetadataInfo(type);
-            if (!entityTableNames.ContainsKey(objectInfo.FullyQualifiedName))
+            string objectFQDN = typeof(T).FullName;
+            if (!entityTableNames.ContainsKey(objectFQDN))
             {
-                string tableName = null;
-                foreach (Attribute attribute in objectInfo.CustomAttributes)
+                ClassInfo objectInfo = TypeInspector.InspectOnlyIfAnotated<T, TableAttribute>();
+                if (objectInfo == null)
                 {
-                    if (attribute is TableAttribute ta)
-                    {
-                        tableName = ta.TableName;
-                        break;
-                    }
+                    throw new TypeLoadException($"Type '{typeof(T).FullName}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute.");
                 }
 
-                if (tableName == null)
-                {
-                    throw new TypeLoadException($"Class '{objectInfo.ClassName}' is not decorated with 'Table' attribute.");
-                }
-
+                string tableName = objectInfo.GetAttributes<TableAttribute>().ToArray()[0].TableName;
                 lock (concurrencyLock)
                 {
-                    entityTableNames.Add(objectInfo.FullyQualifiedName, tableName);
+                    entityTableNames.Add(objectFQDN, tableName);
                 }
             }
 
-            return entityTableNames[objectInfo.FullyQualifiedName];
+            return entityTableNames[objectFQDN];
         }
 
         #endregion
