@@ -15,9 +15,9 @@
     <RepositoryUrl>https://github.com/sujayvsarma/SujaySarma.Sdk.DataSources.AzureTables</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>orm,data,azure,azure tables,cosmosdb,sql server</PackageTags>
-    <Version>2.0</Version>
-    <PackageReleaseNotes>Massive improvements in code. Now depends on the completely re-written SujaySarma.Sdk.Core library. Also takes a dependency on the 2.x series of the Azure CosmosDB libraries (this gets rid of the DocumentDB chain and is faster and better with the same surface API). Also, this version is .NET Core 3.1.</PackageReleaseNotes>
-    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <Version>2.1</Version>
+    <PackageReleaseNotes>Bug fixes: Fixed a concurrency bug.</PackageReleaseNotes>
+    <AssemblyVersion>2.1.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

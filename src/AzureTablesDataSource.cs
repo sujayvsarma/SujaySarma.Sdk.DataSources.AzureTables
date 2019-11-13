@@ -4,6 +4,7 @@ using SujaySarma.Sdk.Core.Reflection;
 using SujaySarma.Sdk.DataSources.AzureTables.Attributes;
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -383,25 +384,19 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// <typeparam name="T">Class type of the business object</typeparam>
         /// <returns>Name of the table</returns>
         public static string GetTableName<T>() where T : class
-        {
-            string objectFQDN = typeof(T).FullName;
-            if (!entityTableNames.ContainsKey(objectFQDN))
-            {
-                ClassInfo objectInfo = TypeInspector.InspectOnlyIfAnotated<T, TableAttribute>();
-                if (objectInfo == null)
-                {
-                    throw new TypeLoadException($"Type '{typeof(T).FullName}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute.");
-                }
+            => entityTableNames.GetOrAdd(
+                    typeof(T).FullName,
+                    (objectName) =>
+                    {
+                        ClassInfo objectInfo = TypeInspector.InspectOnlyIfAnotated<T, TableAttribute>();
+                        if (objectInfo == null)
+                        {
+                            throw new TypeLoadException($"Type '{typeof(T).FullName}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute.");
+                        }
 
-                string tableName = objectInfo.GetAttributes<TableAttribute>().ToArray()[0].TableName;
-                lock (concurrencyLock)
-                {
-                    entityTableNames.Add(objectFQDN, tableName);
-                }
-            }
-
-            return entityTableNames[objectFQDN];
-        }
+                        return objectInfo.GetAttributes<TableAttribute>().ToArray()[0].TableName;
+                    }
+                );
 
         #endregion
 
@@ -421,8 +416,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
 
         #endregion
 
-        private static readonly Dictionary<string, string> entityTableNames = new Dictionary<string, string>();
-        private static readonly object concurrencyLock = new object();
+        private static readonly ConcurrentDictionary<string, string> entityTableNames = new ConcurrentDictionary<string, string>();
 
     }
 }
