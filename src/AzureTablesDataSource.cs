@@ -7,6 +7,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace SujaySarma.Sdk.DataSources.AzureTables
@@ -104,10 +105,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// <summary>
         /// Close the connection (Table property is set to NULL)
         /// </summary>
-        public void Close()
-        {
-            Table = null;
-        }
+        public void Close() => Table = null;
 
         /// <summary>
         /// Opens a connection reference to the current <see cref="DatabaseName"/> and creates the table if it does not already exist.
@@ -115,7 +113,10 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         public void Open()
         {
             Table = Connection.GetTableReference(DatabaseName);
-            Table.CreateIfNotExists();
+            if (!Table.Exists())
+            {
+                Table.Create();
+            }
         }
 
         /// <summary>
@@ -126,8 +127,12 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// <param name="rowKey">Value of the row key (optional)</param>
         /// <param name="otherFilters">Other filters to use (optional). This should not contain the partition and row key filters if those are already provided 
         /// as the speciifc arguments (<paramref name="partitionKey"/> or <paramref name="rowKey"/>).</param>
+        /// <param name="columnsList">List of columns to return. Set NULL to return everything.</param>
+        /// <param name="orderByColumnName">Name of the column to sort results by (only if default sort - PK/RK - is not desirable). Only one column name is allowed.</param>
+        /// <param name="isOrderByDescending">If true, performs a DESC sort by the <paramref name="orderByColumnName"/> column.</param>
+        /// <param name="count">Number of results to return. Set zero or negative values to return all matches.</param>
         /// <returns>A lazily retrieved collection of business objects</returns>
-        public IEnumerable<T> Select<T>(string partitionKey = null, string rowKey = null, string otherFilters = null)
+        public IEnumerable<T> Select<T>(string partitionKey = null, string rowKey = null, string otherFilters = null, IEnumerable<string> columnsList = null, string orderByColumnName = null, bool isOrderByDescending = false, int count = -1)
             where T : class, new()
         {
             StringBuilder query = new StringBuilder();
@@ -149,6 +154,46 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             }
 
             TableQuery<AzureTableEntity> tableQuery = (new TableQuery<AzureTableEntity>()).Where(query.ToString());
+
+            if (columnsList != null)
+            {
+                List<string> columnNamesToReturn = new List<string>();
+                foreach (string item in columnsList)
+                {
+                    if ((!string.IsNullOrWhiteSpace(item)) && (!columnNamesToReturn.Contains(item)))
+                    {
+                        columnNamesToReturn.Add(item);
+                    }
+                }
+
+                if (columnNamesToReturn.Count > 0)
+                {
+                    // Partition & Row key must always be selected, or we get weird results!
+
+                    if (!columnNamesToReturn.Contains("PartitionKey"))
+                    {
+                        columnNamesToReturn.Add("PartitionKey");
+                    }
+
+                    if (!columnNamesToReturn.Contains("RowKey"))
+                    {
+                        columnNamesToReturn.Add("RowKey");
+                    }
+
+                    tableQuery.Select(columnNamesToReturn);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(orderByColumnName))
+            {
+                tableQuery = (isOrderByDescending ? tableQuery.OrderByDesc(orderByColumnName) : tableQuery.OrderBy(orderByColumnName));
+            }
+
+            if (count > 0)
+            {
+                tableQuery = tableQuery.Take(count);
+            }
+
             foreach (AzureTableEntity entity in GetTable<T>().ExecuteQuery(tableQuery))
             {
                 yield return entity.To<T>();
@@ -183,12 +228,49 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         }
 
         /// <summary>
+        /// Insert the provided object into the table
+        /// </summary>
+        /// <typeparam name="T">Type of business object</typeparam>
+        /// <param name="item">Business object</param>
+        /// <returns>Zero if nothing was inserted, One if the object was inserted</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ulong Insert<T>(T item)
+            where T : class
+        {
+            if (item != null)
+            {
+                ExecuteNonQuery<T>(TableOperation.Insert(AzureTableEntity.From(item)));
+                return 1L;
+            }
+
+            return 0L;
+        }
+
+        /// <summary>
         /// Updates the provided objects into the table.
         /// </summary>
         /// <typeparam name="T">Type of business object</typeparam>
         /// <param name="objects">Collection of objects</param>
         public ulong Update<T>(IEnumerable<T> objects) where T : class => UpdateInternal(objects, false);
 
+        /// <summary>
+        /// Update the provided object into the table
+        /// </summary>
+        /// <typeparam name="T">Type of business object</typeparam>
+        /// <param name="item">Business object</param>
+        /// <returns>Zero if nothing was updated, One if the object was updated</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ulong Update<T>(T item)
+            where T : class
+        {
+            if (item != null)
+            {
+                ExecuteNonQuery<T>(TableOperation.Merge(AzureTableEntity.From(item)));
+                return 1L;
+            }
+
+            return 0L;
+        }
 
         /// <summary>
         /// Performs the actual UPDATE operation
@@ -249,7 +331,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                 TableBatchOperation delete = new TableBatchOperation();
                 foreach (T instance in objects)
                 {
-                    delete.Delete(AzureTableEntity.From(instance));
+                    delete.Delete(AzureTableEntity.From(instance, true));
                 }
 
                 ulong count = (ulong)delete.Count;
@@ -258,6 +340,45 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                     ExecuteNonQuery<T>(delete);
                     return count;
                 }
+            }
+
+            return 0L;
+        }
+
+        /// <summary>
+        /// Delete the provided object from the table
+        /// </summary>
+        /// <typeparam name="T">Type of business object</typeparam>
+        /// <param name="item">Business object</param>
+        /// <returns>Zero if nothing was deleted, One if the object was deleted</returns>
+        public ulong Delete<T>(T item)
+            where T : class
+        {
+            if (item != null)
+            {
+                // we need to check if we are soft-deleting!
+                ClassInfo objectInfo = TypeInspector.InspectOnlyIfAnotated<T, TableAttribute>();
+                if (objectInfo == null)
+                {
+                    throw new TypeLoadException($"Type '{typeof(T).FullName}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute.");
+                }
+
+                TableAttribute tableAttribute = objectInfo.GetAttributes<TableAttribute>().ToArray()[0];
+                AzureTableEntity entity = AzureTableEntity.From(item);
+                TableOperation updateOrDeleteOperation;
+
+                if (tableAttribute.UseSoftDelete)
+                {
+                    entity.AddOrUpdateProperty(AzureTableEntity.PROPERTY_NAME_ISDELETED, true);
+                    updateOrDeleteOperation = TableOperation.Merge(entity);
+                }
+                else
+                {
+                    updateOrDeleteOperation = TableOperation.Delete(entity);
+                }
+
+                ExecuteNonQuery<T>(updateOrDeleteOperation);
+                return 1L;
             }
 
             return 0L;
@@ -308,6 +429,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             ExecuteNonQuery<T>(insert);
         }
 
+
         /// <summary>
         /// Execute a DML operation
         /// </summary>
@@ -357,9 +479,37 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                     }
                 }
 
-                table.ExecuteBatch(batchOperation);
+                TableBatchOperation batchPage = new TableBatchOperation();
+
+                // all entities in a batch must have the same partition key:
+                foreach (IEnumerable<TableOperation> operations in batchOperation.GroupBy(o => o.Entity.PartitionKey))
+                {
+                    // order elements in a partition by row key so that we reduce tablescans
+                    foreach (TableOperation operation in operations.OrderBy(o => o.Entity.RowKey))
+                    {
+                        batchPage.Add(operation);
+                        if (batchPage.Count == 100)
+                        {
+                            table.ExecuteBatch(batchPage);
+                            batchPage.Clear();
+                        }
+                    }
+                }
+
+                // get the remaining
+                if (batchPage.Count > 0)
+                {
+                    table.ExecuteBatch(batchPage);
+                }
             }
         }
+
+        /// <summary>
+        /// Get a list of tables in the account
+        /// </summary>
+        /// <returns>IEnumerable of CloudTables</returns>
+        public IEnumerable<CloudTable> ListTables() => Connection.ListTables();
+
 
         /// <summary>
         /// Returns a table reference for the provided class. The call is equivalent of calling 

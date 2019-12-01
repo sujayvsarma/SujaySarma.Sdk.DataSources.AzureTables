@@ -172,9 +172,10 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// Create a table entity from a business object
         /// </summary>
         /// <param name="instance">Business object instance</param>
+        /// <param name="forDelete">If TRUE, only the partition and row key data is extracted. We don't waste cycles populating other properties</param>
         /// <typeparam name="T">Type of the business object instance</typeparam>
         /// <returns>The instantiated TableEntity</returns>
-        public static AzureTableEntity From<T>(T instance)
+        public static AzureTableEntity From<T>(T instance, bool forDelete = false)
             where T : class
         {
             if (instance == null)
@@ -299,6 +300,16 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                 {
                     entity.AddOrUpdateProperty(entityPropertyName, value);
                 }
+
+                if (forDelete && hasPartitionKey && hasRowKey)
+                {
+                    break;
+                }
+            }
+
+            if (forDelete && hasPartitionKey && hasRowKey)
+            {
+                return entity;
             }
 
             foreach (FieldInfo fieldInfo in objectInfo.Fields)
@@ -409,7 +420,13 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                 {
                     entity.AddOrUpdateProperty(entityPropertyName, value);
                 }
+
+                if (forDelete && hasPartitionKey && hasRowKey)
+                {
+                    break;
+                }
             }
+
             return entity;
         }
 
@@ -482,10 +499,12 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                     if (attribute is PartitionKeyAttribute)
                     {
                         propertyInfo.Write(instance, PartitionKey);
+                        break;
                     }
                     else if (attribute is RowKeyAttribute)
                     {
                         propertyInfo.Write(instance, RowKey);
+                        break;
                     }
                     else if (attribute is TableColumnAttribute tc)
                     {
@@ -531,15 +550,8 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                                 break;
                         }
 
-                        try
-                        {
-                            propertyInfo.Write(instance, value);
-                        }
-                        catch
-                        {
-                            // try deserializing
-                            propertyInfo.Write(instance, JsonSerializer.Deserialize(value as string, propertyInfo.Type));
-                        }
+                        propertyInfo.Write(instance, value);
+                        break;
                     }
                 }
             }
@@ -551,10 +563,12 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                     if (attribute is PartitionKeyAttribute)
                     {
                         fieldInfo.Write(instance, PartitionKey);
+                        break;
                     }
                     else if (attribute is RowKeyAttribute)
                     {
                         fieldInfo.Write(instance, RowKey);
+                        break;
                     }
                     else if (attribute is TableColumnAttribute tc)
                     {
@@ -600,15 +614,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                                 break;
                         }
 
-                        try
-                        {
-                            fieldInfo.Write(instance, value);
-                        }
-                        catch
-                        {
-                            // try deserializing
-                            fieldInfo.Write(instance, JsonSerializer.Deserialize(value as string, fieldInfo.Type));
-                        }
+                        fieldInfo.Write(instance, value);
                         break;
                     }
                 }
@@ -645,10 +651,12 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                             if (attribute is PartitionKeyAttribute)
                             {
                                 propertyInfo.Write(instance, tableEntity.PartitionKey);
+                                break;
                             }
                             else if (attribute is RowKeyAttribute)
                             {
                                 propertyInfo.Write(instance, tableEntity.RowKey);
+                                break;
                             }
                             else if (attribute is TableColumnAttribute tc)
                             {
@@ -694,15 +702,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                                         break;
                                 }
 
-                                try
-                                {
-                                    propertyInfo.Write(instance, value);
-                                }
-                                catch
-                                {
-                                    // try deserializing
-                                    propertyInfo.Write(instance, JsonSerializer.Deserialize(value as string, propertyInfo.Type));
-                                }
+                                propertyInfo.Write(instance, value);
                                 break;
                             }
                         }
@@ -764,15 +764,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                                         break;
                                 }
 
-                                try
-                                {
-                                    fieldInfo.Write(instance, value);
-                                }
-                                catch
-                                {
-                                    // try deserializing
-                                    fieldInfo.Write(instance, JsonSerializer.Deserialize(value as string, fieldInfo.Type));
-                                }
+                                fieldInfo.Write(instance, value);
                                 break;
                             }
                         }

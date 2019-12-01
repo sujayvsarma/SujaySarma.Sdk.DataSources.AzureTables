@@ -15,9 +15,9 @@
     <RepositoryUrl>https://github.com/sujayvsarma/SujaySarma.Sdk.DataSources.AzureTables</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>orm,data,azure,azure tables,cosmosdb,sql server</PackageTags>
-    <Version>2.1</Version>
-    <PackageReleaseNotes>Bug fixes: Fixed a concurrency bug.</PackageReleaseNotes>
-    <AssemblyVersion>2.1.0.0</AssemblyVersion>
+    <Version>2.5</Version>
+    <PackageReleaseNotes>New fire and forget OperationQueue class (check it out!), and some optimizations for usability, perf and concurrency in the AzureTablesDataSource methods. Check them out. NO BREAKING CHANGES.</PackageReleaseNotes>
+    <AssemblyVersion>2.5.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -25,10 +25,16 @@
     <CodeAnalysisRuleSet />
     <WarningsAsErrors>NU1605</WarningsAsErrors>
     <NoWarn>1701;1702;NU5104</NoWarn>
+    <DebugType>embedded</DebugType>
+    <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <CodeAnalysisRuleSet />
+    <GenerateSerializationAssemblies>Off</GenerateSerializationAssemblies>
+    <DebugType>embedded</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <DefineConstants>TRACE</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
