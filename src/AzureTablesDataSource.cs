@@ -1,7 +1,7 @@
 ﻿using Microsoft.Azure.Cosmos.Table;
 
-using SujaySarma.Sdk.Core.Reflection;
 using SujaySarma.Sdk.DataSources.AzureTables.Attributes;
+using SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector;
 
 using System;
 using System.Collections.Concurrent;
@@ -13,56 +13,28 @@ using System.Text;
 namespace SujaySarma.Sdk.DataSources.AzureTables
 {
     /// <summary>
-    /// Data source that helps interact with data stored in Azure/CosmosDB tables using the classic Azure Tables API.
+    /// Data source that helps interact with data stored in Azure/CosmosDB tables 
+    /// using the Azure Tables API.
     /// </summary>
     public class AzureTablesDataSource
     {
+
         #region Properties
 
         /// <summary>
-        /// Name of the database currently connected to
-        /// </summary>
-        public string DatabaseName { get; private set; } = null;
-
-        /// <summary>
-        /// The connection string for the current connection
-        /// </summary>
-        public string ConnectionString { get; private set; } = null;
-
-        /// <summary>
-        /// Flag indicating if the data source allows reading data
-        /// </summary>
-        public virtual bool CanRead => true;
-
-        /// <summary>
-        /// Flag indicating if the data source allows writing data
-        /// </summary>
-        public virtual bool CanWrite => true;
-
-        /// <summary>
-        /// Flag indicating if the data source allows deleting of data
-        /// </summary>
-        public virtual bool CanDelete => true;
-
-        /// <summary>
-        /// The Azure storage account
+        /// Reference to the Azure Storage Account class
         /// </summary>
         public AzureStorageAccount StorageAccount { get; private set; } = null;
 
         /// <summary>
-        /// The CloudTableClient used for interacting with the Azure/CosmosDB table system
+        /// Name of the current table
         /// </summary>
-        public CloudTableClient Connection { get; private set; } = null;
-
-        /// <summary>
-        /// The CloudTable currently connected to
-        /// </summary>
-        public CloudTable Table { get; private set; } = null;
+        public string CurrentTableName { get; private set; }
 
         #endregion
 
         /// <summary>
-        /// Initialize the data source
+        /// Initialize the data source. Also ensures that the table exists.
         /// </summary>
         /// <param name="storageConnectionString">Storage connection string</param>
         /// <param name="tableName">Name of the table to connect to</param>
@@ -79,45 +51,17 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             }
 
             StorageAccount = new AzureStorageAccount(storageConnectionString);
-            ConnectionString = StorageAccount.ConnectionString;
-            DatabaseName = tableName;
+            CurrentTableName = tableName;
 
-            Connection = StorageAccount.GetCloudTableClient();
+            _currentTableClient = StorageAccount.GetCloudTableClient();
+            _currentTableReference = _currentTableClient.GetTableReference(tableName);
+            if (! _currentTableReference.Exists())
+            {
+                _currentTableReference.Create();
+            }
         }
 
         #region Methods
-
-        /// <summary>
-        /// Change the connection to the provided database name (Table property is reset to the new table)
-        /// </summary>
-        /// <param name="newTableName">Name of another table to connect to</param>
-        public void ChangeDatabase(string newTableName)
-        {
-            if (DatabaseName != null)
-            {
-                Close();
-            }
-
-            DatabaseName = newTableName;
-            Open();
-        }
-
-        /// <summary>
-        /// Close the connection (Table property is set to NULL)
-        /// </summary>
-        public void Close() => Table = null;
-
-        /// <summary>
-        /// Opens a connection reference to the current <see cref="DatabaseName"/> and creates the table if it does not already exist.
-        /// </summary>
-        public void Open()
-        {
-            Table = Connection.GetTableReference(DatabaseName);
-            if (!Table.Exists())
-            {
-                Table.Create();
-            }
-        }
 
         /// <summary>
         /// Executes a SELECT command against the table. Note that this method uses "yield return" for maximizing efficiency! 
@@ -194,7 +138,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                 tableQuery = tableQuery.Take(count);
             }
 
-            foreach (AzureTableEntity entity in GetTable<T>().ExecuteQuery(tableQuery))
+            foreach (AzureTableEntity entity in _currentTableReference.ExecuteQuery(tableQuery))
             {
                 yield return entity.To<T>();
             }
@@ -316,14 +260,13 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             if (objects != null)
             {
                 // we need to check if we are soft-deleting!
-                ClassInfo objectInfo = TypeInspector.InspectOnlyIfAnotated<T, TableAttribute>();
+                ClassInformation objectInfo = TypeInspector.InspectForAzureTables<T>();
                 if (objectInfo == null)
                 {
                     throw new TypeLoadException($"Type '{typeof(T).FullName}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute.");
                 }
 
-                TableAttribute tableAttribute = objectInfo.GetAttributes<TableAttribute>().ToArray()[0];
-                if (tableAttribute.UseSoftDelete)
+                if (objectInfo.TableAttribute.UseSoftDelete)
                 {
                     return UpdateInternal(objects, true);
                 }
@@ -357,13 +300,13 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             if (item != null)
             {
                 // we need to check if we are soft-deleting!
-                ClassInfo objectInfo = TypeInspector.InspectOnlyIfAnotated<T, TableAttribute>();
+                ClassInformation objectInfo = TypeInspector.InspectForAzureTables<T>();
                 if (objectInfo == null)
                 {
                     throw new TypeLoadException($"Type '{typeof(T).FullName}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute.");
                 }
 
-                TableAttribute tableAttribute = objectInfo.GetAttributes<TableAttribute>().ToArray()[0];
+                TableAttribute tableAttribute = objectInfo.TableAttribute;
                 AzureTableEntity entity = AzureTableEntity.From(item);
                 TableOperation updateOrDeleteOperation;
 
@@ -414,7 +357,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             }
 
             TableQuery<AzureTableEntity> tableQuery = (new TableQuery<AzureTableEntity>()).Where(query.ToString());
-            AzureTableEntity originalEntity = GetTable<T>().ExecuteQuery(tableQuery).FirstOrDefault();
+            AzureTableEntity originalEntity = _currentTableReference.ExecuteQuery(tableQuery).FirstOrDefault();
             if (originalRowKey == default)
             {
                 Insert(new T[] { newCopy });
@@ -439,20 +382,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         public void ExecuteNonQuery<T>(TableOperation operation, string tableName = null)
             where T : class
         {
-            CloudTable table = null;
-            if (string.IsNullOrWhiteSpace(tableName))
-            {
-                table = GetTable<T>();
-            }
-            else
-            {
-                if (!DatabaseName.Equals(tableName, StringComparison.InvariantCulture))
-                {
-                    ChangeDatabase(tableName);
-                }
-            }
-
-            table.Execute(operation);
+            _currentTableReference.Execute(operation);
         }
 
         /// <summary>
@@ -466,19 +396,6 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         {
             if (batchOperation.Count > 0)
             {
-                CloudTable table = null;
-                if (string.IsNullOrWhiteSpace(tableName))
-                {
-                    table = GetTable<T>();
-                }
-                else
-                {
-                    if (!DatabaseName.Equals(tableName, StringComparison.InvariantCulture))
-                    {
-                        ChangeDatabase(tableName);
-                    }
-                }
-
                 TableBatchOperation batchPage = new TableBatchOperation();
 
                 // all entities in a batch must have the same partition key:
@@ -490,7 +407,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                         batchPage.Add(operation);
                         if (batchPage.Count == 100)
                         {
-                            table.ExecuteBatch(batchPage);
+                            _currentTableReference.ExecuteBatch(batchPage);
                             batchPage.Clear();
                         }
                     }
@@ -499,7 +416,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                 // get the remaining
                 if (batchPage.Count > 0)
                 {
-                    table.ExecuteBatch(batchPage);
+                    _currentTableReference.ExecuteBatch(batchPage);
                 }
             }
         }
@@ -508,25 +425,8 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// Get a list of tables in the account
         /// </summary>
         /// <returns>IEnumerable of CloudTables</returns>
-        public IEnumerable<CloudTable> ListTables() => Connection.ListTables();
+        public IEnumerable<CloudTable> ListTables() => _currentTableClient.ListTables();
 
-
-        /// <summary>
-        /// Returns a table reference for the provided class. The call is equivalent of calling 
-        /// <see cref="ChangeDatabase(string)"/> for the table.
-        /// </summary>
-        /// <typeparam name="T">Type of object</typeparam>
-        /// <returns>CloudTable reference, created if not exists</returns>
-        public CloudTable GetTable<T>() where T : class
-        {
-            string tableName = GetTableName<T>();
-            if ((Table == null) || (!DatabaseName.Equals(tableName, StringComparison.InvariantCulture)))
-            {
-                ChangeDatabase(tableName);
-            }
-
-            return Table;
-        }
 
         /// <summary>
         /// Get the name of the table for the object
@@ -538,13 +438,13 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                     typeof(T).FullName,
                     (objectName) =>
                     {
-                        ClassInfo objectInfo = TypeInspector.InspectOnlyIfAnotated<T, TableAttribute>();
+                        ClassInformation objectInfo = TypeInspector.InspectForAzureTables<T>();
                         if (objectInfo == null)
                         {
                             throw new TypeLoadException($"Type '{typeof(T).FullName}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute.");
                         }
 
-                        return objectInfo.GetAttributes<TableAttribute>().ToArray()[0].TableName;
+                        return objectInfo.TableAttribute.TableName;
                     }
                 );
 
@@ -556,8 +456,8 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         {
             if (!alreadyDisposed)
             {
-                Table = null;
-                Connection = null;
+                _currentTableReference = null;
+                _currentTableClient = null;
 
                 alreadyDisposed = true;
             }
@@ -567,6 +467,8 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         #endregion
 
         private static readonly ConcurrentDictionary<string, string> entityTableNames = new ConcurrentDictionary<string, string>();
-
+        
+        private CloudTableClient _currentTableClient = null;
+        private CloudTable _currentTableReference = null;
     }
 }

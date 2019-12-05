@@ -83,9 +83,10 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// <param name="businessObjects">Business object instances - cannot be NULL.</param>
         /// <param name="type">Type of TableBatchOperation to generate</param>
         /// <returns>QueueID. Use it to remove the item later (if required)</returns>
-        public ulong Add<T>(IEnumerable<T> businessObjects, TableOperationType type) where T : class
+        public void Add<T>(IEnumerable<T> businessObjects, TableOperationType type) where T : class
         {
-            if ((type == TableOperationType.Invalid) || (type == TableOperationType.Retrieve))
+            int t = (int)type;
+            if ((t < 0) || (t > 5))
             {
                 throw new ArgumentOutOfRangeException("Unsupported operation for queue!");
             }
@@ -95,6 +96,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                 throw new ArgumentNullException("businessObject");
             }
 
+            int currentBatchSlots = 0;
             TableBatchOperation batch = new TableBatchOperation();
             foreach(T obj in businessObjects)
             {
@@ -110,11 +112,26 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                 };
 
                 batch.Add(tableOperation);
+                currentBatchSlots++;
+
+                if (currentBatchSlots == 100)
+                {
+                    flushQueue(batch);
+                    currentBatchSlots = 0;
+                }
             }
 
-            _queueOrder.Enqueue(_queueIndex);
-            _queue.TryAdd(_queueIndex++, new TableBatchOperationWrapper(batch, AzureTablesDataSource.GetTableName<T>()));
-            return _queueIndex;
+            if (currentBatchSlots > 0)
+            {
+                flushQueue(batch);
+            }
+
+            void flushQueue(TableBatchOperation queue)
+            {
+                _queueOrder.Enqueue(_queueIndex);
+                _queue.TryAdd(_queueIndex++, new TableBatchOperationWrapper(queue, AzureTablesDataSource.GetTableName<T>()));
+
+            }
         }
 
         /// <summary>

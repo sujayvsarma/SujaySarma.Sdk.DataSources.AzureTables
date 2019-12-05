@@ -6,7 +6,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.Attributes
     /// Provide the data table column name the value for this property or field is stored in or retrieved from.
     /// </summary>
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = false, Inherited = true)]
-    public sealed class TableColumnAttribute : Attribute
+    public sealed class TableColumnAttribute : AzureColumnTypeBaseAttribute
     {
         /// <summary>
         /// Name of the column
