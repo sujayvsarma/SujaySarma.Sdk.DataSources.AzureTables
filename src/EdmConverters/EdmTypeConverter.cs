@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel;
+using System.Reflection;
 
 namespace SujaySarma.Sdk.DataSources.AzureTables.EdmConverters
 {
@@ -35,6 +36,35 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.EdmConverters
             TypeConverter converter = TypeDescriptor.GetConverter(destinationType);
             if ((converter == null) || (!converter.CanConvertTo(destinationType)))
             {
+                // see if type has a Parse static method
+                MethodInfo[] methods = destinationType.GetMethods(BindingFlags.Public | BindingFlags.Static);
+                if ((methods != null) && (methods.Length > 0))
+                {
+                    Type sourceType = ((value == null) ? typeof(object) : value.GetType());
+                    foreach(MethodInfo m in methods)
+                    {
+                        if (m.Name.Equals("Parse"))
+                        {
+                            ParameterInfo p = m.GetParameters()?[0];
+                            if ((p != null) && (p.ParameterType == sourceType))
+                            {
+                                return m.Invoke(null, new object[] { value });
+                            }
+                        }
+
+                        if (m.Name.Equals("TryParse"))
+                        {
+                            ParameterInfo p = m.GetParameters()?[0];
+                            if ((p != null) && (p.ParameterType == sourceType))
+                            {
+                                object[] parameters = new object[] { value, null };
+                                bool tpResult = (bool)m.Invoke(null, parameters);
+                                return (tpResult ? parameters[1] : default);
+                            }
+                        }
+                    }
+                }
+
                 throw new TypeLoadException($"Could not find type converters for '{destinationType.Name}' type.");
             }
 

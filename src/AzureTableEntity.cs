@@ -7,9 +7,6 @@ using SujaySarma.Sdk.DataSources.AzureTables.Utility;
 
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
-using System.Text.Json;
 
 namespace SujaySarma.Sdk.DataSources.AzureTables
 {
@@ -117,11 +114,16 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
 
             if (_properties[name] == null)
             {
-                return null;
+                return defaultValue;
             }
 
-            // why were we returning this: ((EntityProperty)_properties[name]).PropertyAsObject ???
-            return _properties[name];
+            object value = _properties[name];
+            if (value is EntityProperty)
+            {
+                return ((EntityProperty)value).PropertyAsObject;
+            }
+
+            return value;
         }
 
         #endregion
@@ -315,7 +317,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                             object value = GetPropertyValue(member.TableEntityColumn.ColumnName, default);
                             member.Write(instance, 
                                     ((value == default) || (value == null)) 
-                                    ? null 
+                                    ? default 
                                     : GetAcceptableValue(value.GetType(), member.Type, value)
                                 );
                             break;
@@ -433,9 +435,15 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// <returns>The value of type destinationType</returns>
         private static object GetAcceptableValue(Type sourceType, Type destinationType, object value)
         {
-            if (EdmTypeConverter.NeedsConversion(sourceType, destinationType))
+            Type srcActualType = Nullable.GetUnderlyingType(sourceType);
+            Type convertFromType = srcActualType ?? sourceType;
+
+            Type destActualType = Nullable.GetUnderlyingType(destinationType);
+            Type convertToType = destActualType ?? destinationType;
+
+            if (EdmTypeConverter.NeedsConversion(convertFromType, convertToType))
             {
-                return EdmTypeConverter.ConvertTo(destinationType, value);
+                return EdmTypeConverter.ConvertTo(convertToType, value);
             }
 
             return value;
