@@ -167,8 +167,10 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
 
                     tables[value.TableName].ExecuteBatch(value.Batch);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    System.Diagnostics.Trace.WriteLine($"[OperationBatchQueue]: Table name: {value.TableName}\r\nException: {ex.Message}.");
+
                     // eat the exception, we dont want to miss our next timer 
                     // because of improper operations in the queue!
                 }
