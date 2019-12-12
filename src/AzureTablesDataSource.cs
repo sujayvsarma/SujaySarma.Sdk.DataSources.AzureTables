@@ -94,7 +94,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
 
             if (!string.IsNullOrWhiteSpace(otherFilters))
             {
-                query.Append($"and ({otherFilters})");
+                query.Append($" and ({otherFilters})");
             }
 
             TableQuery<AzureTableEntity> tableQuery = (new TableQuery<AzureTableEntity>()).Where(query.ToString());

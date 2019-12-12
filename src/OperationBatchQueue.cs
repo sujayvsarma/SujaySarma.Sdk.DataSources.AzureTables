@@ -1,9 +1,9 @@
 ﻿using Microsoft.Azure.Cosmos.Table;
+
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace SujaySarma.Sdk.DataSources.AzureTables
@@ -141,10 +141,50 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         }
 
         /// <summary>
+        /// Number of elements currently in queue
+        /// </summary>
+        public int Count => _queue.Count;
+
+        /// <summary>
+        /// Returns if the queue currently contains items to be processed
+        /// </summary>
+        public bool HasItems => (_queue.Count > 0);
+
+        /// <summary>
+        /// Drain the queue immediately. Returns only after the queue is empty
+        /// </summary>
+        public void Drain()
+        {
+            _isDraining = true;
+
+            while (_isTimerRunning)
+            {
+                Thread.Sleep(100);
+            }
+
+            if (_queue.Count == 0)
+            {
+                return;
+            }
+
+            _isTimerRunning = true;
+            _timer.Change(Timeout.Infinite, Timeout.Infinite);
+
+            OnQueueProcessorTimerElapsed(null);
+        }
+
+        /// <summary>
         /// Event handler for the _timer's Elapsed event
         /// </summary>
         private void OnQueueProcessorTimerElapsed(object _)
         {
+            if (_isTimerRunning && (!_isDraining))
+            {
+                return;
+            }
+
+            _isTimerRunning = true;
+
             if (_queue.Count == 0)
             {
                 ResetTimer();
@@ -184,7 +224,11 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// </summary>
         private void ResetTimer()
         {
-            _timer.Change(__TIMER_PERIOD, -1);
+            if (!_isDraining)
+            {
+                _timer.Change(__TIMER_PERIOD, -1);
+                _isTimerRunning = false;
+            }
         }
 
         /// <summary>
@@ -202,6 +246,8 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         private readonly Timer _timer;
         private readonly int __TIMER_PERIOD = 5000;
         private readonly Dictionary<string, CloudTable> tables = new Dictionary<string, CloudTable>();
+
+        private bool _isTimerRunning = false, _isDraining = false;
 
         /// <summary>
         /// Wraps a TableBatchOperation so that we preserve the table it applies to

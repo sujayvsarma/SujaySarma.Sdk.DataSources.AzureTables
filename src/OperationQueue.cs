@@ -22,6 +22,12 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// <returns>QueueID. Use it to remove the item later (if required)</returns>
         public ulong Add(TableOperation operation, string tableName)
         {
+            if (_isDraining)
+            {
+                // no items can be added during a drain
+                throw new Exception("Cannot queue items during a drain.");
+            }
+
             if ((operation == null) || (operation.OperationType == TableOperationType.Invalid) || (operation.OperationType == TableOperationType.Retrieve))
             {
                 throw new ArgumentOutOfRangeException("Unsupported operation for queue!");
@@ -44,6 +50,12 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// <returns>QueueID. Use it to remove the item later (if required)</returns>
         public ulong Add<T>(T businessObject, TableOperationType type) where T : class
         {
+            if (_isDraining)
+            {
+                // no items can be added during a drain
+                throw new Exception("Cannot queue items during a drain.");
+            }
+
             if ((type == TableOperationType.Invalid) || (type == TableOperationType.Retrieve))
             {
                 throw new ArgumentOutOfRangeException("Unsupported operation for queue!");
@@ -95,16 +107,62 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// </summary>
         public void Clear()
         {
+            if (_isDraining)
+            {
+                // no items can be added during a drain
+                throw new Exception("Cannot clear queue during a drain.");
+            }
+
             ResetQueueIndex();
             _queue.Clear();
             _queueOrder.Clear();
         }
 
         /// <summary>
+        /// Number of elements currently in queue
+        /// </summary>
+        public int Count => _queue.Count;
+
+        /// <summary>
+        /// Returns if the queue currently contains items to be processed
+        /// </summary>
+        public bool HasItems => (_queue.Count > 0);
+
+        /// <summary>
+        /// Drain the queue immediately. Returns only after the queue is empty
+        /// </summary>
+        public void Drain()
+        {
+            _isDraining = true;
+
+            while (_isTimerRunning)
+            {
+                Thread.Sleep(100);
+            }
+
+            if (_queue.Count == 0)
+            {
+                return;
+            }
+
+            _isTimerRunning = true;
+            _processQueueTimer.Change(Timeout.Infinite, Timeout.Infinite);
+
+            OnProcessQueueTimerElapsed(null);
+        }
+
+        /// <summary>
         /// Event handler for the _timer's Elapsed event
         /// </summary>
-        private void OnFetchTimerElapsed(object _)
+        private void OnProcessQueueTimerElapsed(object _)
         {
+            if (_isTimerRunning && (! _isDraining))
+            {
+                return;
+            }
+
+            _isTimerRunning = true;
+
             if (_queue.Count == 0)
             {
                 ResetTimer();
@@ -147,7 +205,11 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// </summary>
         private void ResetTimer()
         {
-            _timer.Change(__TIMER_PERIOD, -1);
+            if (!_isDraining)
+            {
+                _processQueueTimer.Change(__TIMER_PERIOD, -1);
+                _isTimerRunning = false;
+            }
         }
 
         /// <summary>
@@ -168,17 +230,18 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         {
             tableClient = CloudStorageAccount.Parse(connectionString).CreateCloudTableClient();
             ResetQueueIndex();
-            _timer = new Timer(OnFetchTimerElapsed, null, __TIMER_PERIOD, -1);
+            _processQueueTimer = new Timer(OnProcessQueueTimerElapsed, null, __TIMER_PERIOD, -1);
         }
 
         private readonly CloudTableClient tableClient;
         private readonly ConcurrentDictionary<ulong, TableOperationWrapper> _queue = new ConcurrentDictionary<ulong, TableOperationWrapper>();
         private readonly Queue<ulong> _queueOrder = new Queue<ulong>();
-        private readonly Timer _timer;
+        private readonly Timer _processQueueTimer;
         private readonly int __TIMER_PERIOD = 5000;
         private readonly Dictionary<string, CloudTable> tables = new Dictionary<string, CloudTable>();
 
         private ulong _queueIndex;
+        private bool _isTimerRunning = false, _isDraining = false;
 
         /// <summary>
         /// Wraps a TableOperation so that we preserve the table it applies to
