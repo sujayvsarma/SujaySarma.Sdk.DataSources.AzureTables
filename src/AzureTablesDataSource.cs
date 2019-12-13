@@ -378,8 +378,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// </summary>
         /// <typeparam name="T">Class type of the business object</typeparam>
         /// <param name="operation">TableOperation to execute</param>
-        /// <param name="tableName">Name of the table. If not specified will be retrieved via ORM reflection</param>
-        public void ExecuteNonQuery<T>(TableOperation operation, string tableName = null)
+        public void ExecuteNonQuery<T>(TableOperation operation)
             where T : class
         {
             _currentTableReference.Execute(operation);
@@ -390,8 +389,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// </summary>
         /// <typeparam name="T">Class type of the business object</typeparam>
         /// <param name="batchOperation">TableBatchOperation to execute</param>
-        /// <param name="tableName">Name of the table. If not specified will be retrieved via ORM reflection</param>
-        public void ExecuteNonQuery<T>(TableBatchOperation batchOperation, string tableName = null)
+        public void ExecuteNonQuery<T>(TableBatchOperation batchOperation)
             where T : class
         {
             if (batchOperation.Count > 0)
