@@ -84,6 +84,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
         private static class Cache
         {
             private static readonly Dictionary<string, ClassInformation> cache = null;
+            private static readonly object cacheAccessLock = new object();
 
             static Cache()
             {
@@ -97,9 +98,12 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
             /// <param name="keyName">The key name of the object</param>
             public static void TrySet(ClassInformation info, string keyName)
             {
-                if (!cache.ContainsKey(keyName))
+                lock (cacheAccessLock)
                 {
-                    cache.Add(keyName, info);
+                    if (!cache.ContainsKey(keyName))
+                    {
+                        cache.Add(keyName, info);
+                    }
                 }
             }
 
