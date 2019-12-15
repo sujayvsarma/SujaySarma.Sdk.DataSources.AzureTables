@@ -15,9 +15,9 @@
     <RepositoryUrl>https://github.com/sujayvsarma/SujaySarma.Sdk.DataSources.AzureTables</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>orm,data,azure,azure tables,cosmosdb,sql server</PackageTags>
-    <Version>2.5</Version>
-    <PackageReleaseNotes>New fire and forget OperationQueue class (check it out!), and some optimizations for usability, perf and concurrency in the AzureTablesDataSource methods. Check them out. NO BREAKING CHANGES.</PackageReleaseNotes>
-    <AssemblyVersion>2.5.0.0</AssemblyVersion>
+    <Version>3.0</Version>
+    <PackageReleaseNotes>Multiple performance improvements and bug fixes.</PackageReleaseNotes>
+    <AssemblyVersion>3.0.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
