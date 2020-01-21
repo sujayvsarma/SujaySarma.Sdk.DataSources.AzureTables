@@ -11,19 +11,25 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
     /// </summary>
     internal static class TypeInspector
     {
-
-        public static ClassInformation InspectForAzureTables<ClassT>()
+        /// <summary>
+        /// Inspect a class for Azure Tables
+        /// </summary>
+        /// <typeparam name="ClassT">Type of business class to be stored into Azure Tables</typeparam>
+        /// <returns>Reflected class metadata</returns>
+        public static ClassInformation? InspectForAzureTables<ClassT>()
             where ClassT : class
         {
+#pragma warning disable CS8604 // Possible null reference argument.
             Type classType = typeof(ClassT);
-            ClassInformation objectMetadata = Cache.TryGet(classType.FullName);
+            ClassInformation? objectMetadata = Cache.TryGet(classType.FullName);
             if (objectMetadata != null)
             {
                 // cache hit
                 return objectMetadata;
             }
+#pragma warning restore CS8604 // Possible null reference argument.
 
-            TableAttribute tableAttribute = classType.GetCustomAttribute<TableAttribute>(true);
+            TableAttribute? tableAttribute = classType.GetCustomAttribute<TableAttribute>(true);
             if (tableAttribute == null)
             {
                 return null;
@@ -40,7 +46,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
                 }
 
                 bool hasAttribute = false;
-                foreach(object attribute in memberAttributes)
+                foreach (object attribute in memberAttributes)
                 {
                     if ((attribute is PartitionKeyAttribute) || (attribute is RowKeyAttribute) || (attribute is TableColumnAttribute))
                     {
@@ -49,7 +55,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
                     }
                 }
 
-                if (! hasAttribute)
+                if (!hasAttribute)
                 {
                     continue;
                 }
@@ -57,11 +63,19 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
                 switch (member.MemberType)
                 {
                     case MemberTypes.Field:
-                        fields.Add(new Field(member as FieldInfo));
+                        FieldInfo? fi = member as FieldInfo;
+                        if (fi != null)
+                        {
+                            fields.Add(new Field(fi));
+                        }
                         break;
 
                     case MemberTypes.Property:
-                        properties.Add(new Property(member as PropertyInfo));
+                        PropertyInfo? pi = member as PropertyInfo;
+                        if (pi != null)
+                        {
+                            properties.Add(new Property(pi));
+                        }
                         break;
                 }
             }
@@ -71,8 +85,10 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
                 return null;
             }
 
+#pragma warning disable CS8604 // Possible null reference argument.
             objectMetadata = new ClassInformation(classType.Name, classType.FullName, tableAttribute, properties, fields);
             Cache.TrySet(objectMetadata, classType.FullName);
+#pragma warning restore CS8604 // Possible null reference argument.
 
             return objectMetadata;
         }
@@ -83,7 +99,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
         /// </summary>
         private static class Cache
         {
-            private static readonly Dictionary<string, ClassInformation> cache = null;
+            private static readonly Dictionary<string, ClassInformation> cache;
             private static readonly object cacheAccessLock = new object();
 
             static Cache()
@@ -112,9 +128,9 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
             /// </summary>
             /// <param name="keyName">Key name of object</param>
             /// <returns>Cached information or NULL</returns>
-            public static ClassInformation TryGet(string keyName)
+            public static ClassInformation? TryGet(string keyName)
             {
-                if (!cache.TryGetValue(keyName, out ClassInformation info))
+                if (!cache.TryGetValue(keyName, out ClassInformation? info))
                 {
                     return null;
                 }

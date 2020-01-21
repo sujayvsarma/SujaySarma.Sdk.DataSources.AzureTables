@@ -18,12 +18,12 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
         /// <summary>
         /// The MethodInfo for the member's GET accessor
         /// </summary>
-        public MethodInfo GetMethod { get; private set; }
+        public MethodInfo? GetMethod { get; private set; }
 
         /// <summary>
         /// The MethodInfo for the member's SET accessor
         /// </summary>
-        public MethodInfo SetMethod { get; private set; }
+        public MethodInfo? SetMethod { get; private set; }
 
         /// <summary>
         /// Initialize the structure for a Property
@@ -44,7 +44,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
         /// <typeparam name="ObjType">Data type of the object to read the property or field of</typeparam>
         /// <param name="obj">The object instance to read the value from</param>
         /// <returns>The value</returns>
-        public override object Read<ObjType>(ObjType obj)
+        public override object? Read<ObjType>(ObjType obj)
         {
             if (obj == null)
             {
@@ -56,7 +56,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
                 return null;
             }
 
-            return GetMethod.Invoke(obj, FLAGS_READ_WRITE, null, null, null);
+            return GetMethod?.Invoke(obj, FLAGS_READ_WRITE, null, null, null);
         }
 
         /// <summary>
@@ -65,7 +65,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
         /// <typeparam name="ObjType">Data type of the object to read the property/field of</typeparam>
         /// <param name="obj">The object instance to write the value to</param>
         /// <param name="value">Value to write out</param>
-        public override void Write<ObjType>(ObjType obj, object value)
+        public override void Write<ObjType>(ObjType obj, object? value)
         {
             if (obj == null)
             {
@@ -78,13 +78,13 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
                 return;
             }
 
-            if ((value == null) && (!IsNullableType))
+            if (value == null)
             {
                 // Trying to set NULL into a non-Nullable type
                 return;
             }
 
-            SetMethod.Invoke(obj, FLAGS_READ_WRITE, null, new object[] { value }, null);
+            SetMethod?.Invoke(obj, FLAGS_READ_WRITE, null, new object[] { value }, null);
         }
     }
 }

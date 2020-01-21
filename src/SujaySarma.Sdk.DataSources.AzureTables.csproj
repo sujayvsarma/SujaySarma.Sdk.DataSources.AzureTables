@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);CopyProjectReferencesToPackage</TargetsForTfmSpecificBuildOutput>
+    <nullable>enable</nullable>
     <LangVersion>8.0</LangVersion>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
@@ -15,9 +16,9 @@
     <RepositoryUrl>https://github.com/sujayvsarma/SujaySarma.Sdk.DataSources.AzureTables</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>orm,data,azure,azure tables,cosmosdb,sql server</PackageTags>
-    <Version>3.0</Version>
-    <PackageReleaseNotes>Multiple performance improvements and bug fixes.</PackageReleaseNotes>
-    <AssemblyVersion>3.0.0.0</AssemblyVersion>
+    <Version>4.0</Version>
+    <PackageReleaseNotes>Refactoring for C# 8.0 "nullable" syntax. Added some new APIs.</PackageReleaseNotes>
+    <AssemblyVersion>4.0.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

@@ -1,7 +1,7 @@
 ﻿using SujaySarma.Sdk.DataSources.AzureTables.Attributes;
 using SujaySarma.Sdk.DataSources.AzureTables.EdmConverters;
+
 using System;
-using System.Collections.Generic;
 using System.Reflection;
 
 namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
@@ -14,7 +14,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
         /// <summary>
         /// Name of the property or field
         /// </summary>
-        public string MemberName { get; private set; } = null;
+        public string MemberName { get; private set; }
 
         /// <summary>
         /// Flag indicating if the member can be written (has a Setter)
@@ -55,7 +55,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
         /// If mapped to a TableEntity's fields, reference to the TableColumnAttribute for that.
         /// (Could be NULL)
         /// </summary>
-        public TableColumnAttribute TableEntityColumn { get; set; } = null;
+        public TableColumnAttribute? TableEntityColumn { get; set; }
 
         /// <summary>
         /// Initialize the structure
@@ -63,6 +63,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
         /// <param name="property">The property</param>
         protected FieldOrPropertyBase(System.Reflection.PropertyInfo property)
         {
+            MemberName = property.Name;
             CanWrite = property.CanWrite;
             CommonInit(property, property.PropertyType);
         }
@@ -73,6 +74,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
         /// <param name="field">The field</param>
         protected FieldOrPropertyBase(System.Reflection.FieldInfo field)
         {
+            MemberName = field.Name;
             CanWrite = (!field.IsInitOnly);
             CommonInit(field, field.FieldType);
         }
@@ -84,7 +86,6 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
         /// <param name="dataType">Type of property/field</param>
         private void CommonInit(System.Reflection.MemberInfo member, Type dataType)
         {
-            MemberName = member.Name;
             Type = dataType;
 
             foreach (Attribute attribute in member.GetCustomAttributes(true))
@@ -103,7 +104,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
                 }
             }
 
-            Type underlyingType = Nullable.GetUnderlyingType(Type);
+            Type? underlyingType = Nullable.GetUnderlyingType(Type);
             TypeCode = Type.GetTypeCode(underlyingType ?? Type);
             IsEdmType = EdmTypeConverter.IsEdmCompatibleType(underlyingType ?? Type);
 
@@ -116,7 +117,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
         /// <typeparam name="ObjType">Data type of the object to read the property/field of</typeparam>
         /// <param name="obj">The object instance to read the value from</param>
         /// <returns>The value</returns>
-        public virtual object Read<ObjType>(ObjType obj) => null;
+        public virtual object? Read<ObjType>(ObjType obj) => null;
 
         /// <summary>
         /// Writes the provided value to the property/field of the object instance
@@ -124,7 +125,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
         /// <typeparam name="ObjType">Data type of the object to read the property/field of</typeparam>
         /// <param name="obj">The object instance to write the value to</param>
         /// <param name="value">Value to write out</param>
-        public virtual void Write<ObjType>(ObjType obj, object value) { }
+        public virtual void Write<ObjType>(ObjType obj, object? value) { }
 
 
         /// <summary>

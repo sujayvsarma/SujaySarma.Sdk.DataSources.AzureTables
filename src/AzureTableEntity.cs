@@ -35,7 +35,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                 _partitionKey = value;
             }
         }
-        private string _partitionKey = null;
+        private string _partitionKey = string.Empty;
 
         /// <summary>
         /// The row key
@@ -53,7 +53,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                 _rowKey = value;
             }
         }
-        private string _rowKey = null;
+        private string _rowKey = string.Empty;
 
         /// <summary>
         /// The LastModified timestamp of the row
@@ -69,7 +69,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
 
         #region Properties -- Expando Implementation
 
-        private IDictionary<string, object> _properties = new Dictionary<string, object>();
+        private IDictionary<string, object?> _properties = new Dictionary<string, object?>();
         internal static string PROPERTY_NAME_ISDELETED = "IsDeleted";
 
         /// <summary>
@@ -77,7 +77,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// </summary>
         /// <param name="name">Name of the property</param>
         /// <param name="value">Value of the property</param>
-        public void AddOrUpdateProperty(string name, object value)
+        public void AddOrUpdateProperty(string name, object? value)
         {
             if (string.IsNullOrWhiteSpace(name))
             {
@@ -100,7 +100,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// <param name="name">Name of the property</param>
         /// <param name="defaultValue">Value to return if the property does not exist</param>
         /// <returns>Value of specified property</returns>
-        public object GetPropertyValue(string name, object defaultValue = null)
+        public object? GetPropertyValue(string name, object? defaultValue = null)
         {
             if (string.IsNullOrWhiteSpace(name))
             {
@@ -117,7 +117,12 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                 return defaultValue;
             }
 
-            object value = _properties[name];
+            object? value = _properties[name];
+            if (value == null)
+            {
+                return null;
+            }
+
             if (value is EntityProperty)
             {
                 return ((EntityProperty)value).PropertyAsObject;
@@ -159,7 +164,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
 
             AzureTableEntity entity = new AzureTableEntity();
 
-            ClassInformation objectInfo = TypeInspector.InspectForAzureTables<T>();
+            ClassInformation? objectInfo = TypeInspector.InspectForAzureTables<T>();
             if (objectInfo == null)
             {
                 throw new TypeLoadException($"Type '{typeof(T).FullName}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute or has no properties/fields mapped to an Azure table.");
@@ -168,7 +173,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             bool hasPartitionKey = false, hasRowKey = false;
             foreach (FieldOrPropertyBase member in objectInfo.FieldsOrProperties)
             {
-                object value = null;
+                object? value = null;
 
                 if (member.IsPartitionKey)
                 {
@@ -183,7 +188,11 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                         throw new Exception("PartitionKey must be NON NULL.");
                     }
 
-                    entity.PartitionKey = GetAcceptableValue(member.Type, typeof(string), value) as string;
+                    if (!(GetAcceptableValue(member.Type, typeof(string), value) is string pk1))
+                    {
+                        throw new InvalidOperationException("PartitionKey cannot be NULL.");
+                    }
+                    entity.PartitionKey = pk1;
                     hasPartitionKey = true;
                 }
                 if (member.IsRowKey)
@@ -199,13 +208,17 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                         throw new Exception("RowKey must be NON NULL.");
                     }
 
-                    entity.RowKey = GetAcceptableValue(member.Type, typeof(string), value) as string;
+                    if (!(GetAcceptableValue(member.Type, typeof(string), value) is string rk1))
+                    {
+                        throw new InvalidOperationException("PartitionKey cannot be NULL.");
+                    }
+                    entity.RowKey = rk1;
                     hasRowKey = true;
                 }
-                if ((! forDelete) && (member.TableEntityColumn != null))
+                if ((!forDelete) && (member.TableEntityColumn != null))
                 {
                     entity.AddOrUpdateProperty(
-                            member.TableEntityColumn.ColumnName, 
+                            member.TableEntityColumn.ColumnName,
                             GetAcceptableValue(member.Type, (member.IsEdmType ? member.Type : typeof(string)), member.Read(instance))
                         );
                 }
@@ -230,7 +243,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// <param name="_">OperationContext, not used by this method</param>
         public void ReadEntity(IDictionary<string, EntityProperty> properties, OperationContext _)
         {
-            _properties = new Dictionary<string, object>();
+            _properties = new Dictionary<string, object?>();
 
             foreach (string propertyName in properties.Keys)
             {
@@ -266,22 +279,14 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         public T To<T>()
             where T : class, new()
         {
-            string localPK = PartitionKey, localRK = RowKey;
-            if (string.IsNullOrWhiteSpace(localPK) || string.IsNullOrWhiteSpace(localRK) || ((bool)GetPropertyValue(PROPERTY_NAME_ISDELETED, false)))
-            {
-                // no representation
-                return null;
-            }
-
-            T instance = new T();
-
-            ClassInformation objectInfo = TypeInspector.InspectForAzureTables<T>();
+            ClassInformation? objectInfo = TypeInspector.InspectForAzureTables<T>();
             if (objectInfo == null)
             {
                 throw new TypeLoadException($"Type '{typeof(T).FullName}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute.");
             }
 
-            foreach(FieldOrPropertyBase member in objectInfo.FieldsOrProperties)
+            T instance = new T();
+            foreach (FieldOrPropertyBase member in objectInfo.FieldsOrProperties)
             {
                 if (member.IsPartitionKey)
                 {
@@ -314,10 +319,10 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                             break;
 
                         default:
-                            object value = GetPropertyValue(member.TableEntityColumn.ColumnName, default);
-                            member.Write(instance, 
-                                    ((value == default) || (value == null)) 
-                                    ? default 
+                            object? value = GetPropertyValue(member.TableEntityColumn.ColumnName, default);
+                            member.Write(instance,
+                                    ((value == default) || (value == null))
+                                    ? default
                                     : GetAcceptableValue(value.GetType(), member.Type, value)
                                 );
                             break;
@@ -337,7 +342,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         public static List<T> ToList<T>(List<AzureTableEntity> records)
             where T : class, new()
         {
-            ClassInformation objectInfo = TypeInspector.InspectForAzureTables<T>();
+            ClassInformation? objectInfo = TypeInspector.InspectForAzureTables<T>();
             if (objectInfo == null)
             {
                 throw new TypeLoadException($"Type '{typeof(T).FullName}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute.");
@@ -383,7 +388,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                                     break;
 
                                 default:
-                                    object value = tableEntity.GetPropertyValue(member.TableEntityColumn.ColumnName, default);
+                                    object? value = tableEntity.GetPropertyValue(member.TableEntityColumn.ColumnName, default);
                                     member.Write(instance,
                                             ((value == default) || (value == null))
                                             ? null
@@ -433,13 +438,18 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// <param name="destinationType">Type of the destination container</param>
         /// <param name="value">Value to convert/change</param>
         /// <returns>The value of type destinationType</returns>
-        private static object GetAcceptableValue(Type sourceType, Type destinationType, object value)
+        private static object? GetAcceptableValue(Type sourceType, Type destinationType, object? value)
         {
-            Type srcActualType = Nullable.GetUnderlyingType(sourceType);
+            Type? srcActualType = Nullable.GetUnderlyingType(sourceType);
             Type convertFromType = srcActualType ?? sourceType;
 
-            Type destActualType = Nullable.GetUnderlyingType(destinationType);
+            Type? destActualType = Nullable.GetUnderlyingType(destinationType);
             Type convertToType = destActualType ?? destinationType;
+
+            if (value == null)
+            {
+                return null;
+            }
 
             if (EdmTypeConverter.NeedsConversion(convertFromType, convertToType))
             {

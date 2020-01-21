@@ -31,7 +31,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.EdmConverters
         /// <param name="destinationType">CLR Type of destination</param>
         /// <param name="value">The value to convert</param>
         /// <returns>The converted value</returns>
-        public static object ConvertTo(Type destinationType, object value)
+        public static object? ConvertTo(Type destinationType, object value)
         {
             TypeConverter converter = TypeDescriptor.GetConverter(destinationType);
             if ((converter == null) || (!converter.CanConvertTo(destinationType)))
@@ -41,25 +41,25 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.EdmConverters
                 if ((methods != null) && (methods.Length > 0))
                 {
                     Type sourceType = ((value == null) ? typeof(object) : value.GetType());
-                    foreach(MethodInfo m in methods)
+                    foreach (MethodInfo m in methods)
                     {
                         if (m.Name.Equals("Parse"))
                         {
-                            ParameterInfo p = m.GetParameters()?[0];
+                            ParameterInfo? p = m.GetParameters()?[0];
                             if ((p != null) && (p.ParameterType == sourceType))
                             {
-                                return m.Invoke(null, new object[] { value });
+                                return m.Invoke(null, new object?[] { value });
                             }
                         }
 
                         if (m.Name.Equals("TryParse"))
                         {
-                            ParameterInfo p = m.GetParameters()?[0];
+                            ParameterInfo? p = m.GetParameters()?[0];
                             if ((p != null) && (p.ParameterType == sourceType))
                             {
-                                object[] parameters = new object[] { value, null };
-                                bool tpResult = (bool)m.Invoke(null, parameters);
-                                return (tpResult ? parameters[1] : default);
+                                object?[]? parameters = new object?[] { value, null };
+                                bool? tpResult = (bool?)m.Invoke(null, parameters);
+                                return ((tpResult.HasValue && tpResult.Value) ? parameters[1] : default);
                             }
                         }
                     }
@@ -71,7 +71,11 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.EdmConverters
             return converter.ConvertTo(value, destinationType);
         }
 
-
+        /// <summary>
+        /// Checks if the provided type is compatible with Edm data types
+        /// </summary>
+        /// <param name="clrType">The .NET CLR type to check</param>
+        /// <returns>True if compatible.</returns>
         public static bool IsEdmCompatibleType(Type clrType)
             => (
                        (clrType.IsEnum)

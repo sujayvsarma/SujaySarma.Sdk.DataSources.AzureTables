@@ -1,4 +1,5 @@
 ﻿using Microsoft.Azure.Cosmos.Table;
+
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -60,26 +61,26 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             {
                 throw new ArgumentOutOfRangeException("Unsupported operation for queue!");
             }
-            
+
             if (businessObject == null)
             {
                 throw new ArgumentNullException("businessObject");
             }
 
-            var tableOperation = type switch
+#pragma warning disable CS8509 // The switch expression does not handle all possible values of its input type (it is not exhaustive).
+            TableOperation operation = type switch
             {
                 TableOperationType.Delete => TableOperation.Delete(AzureTableEntity.From(businessObject, forDelete: true)),
                 TableOperationType.Insert => TableOperation.Insert(AzureTableEntity.From(businessObject)),
                 TableOperationType.InsertOrMerge => TableOperation.InsertOrMerge(AzureTableEntity.From(businessObject)),
                 TableOperationType.InsertOrReplace => TableOperation.InsertOrReplace(AzureTableEntity.From(businessObject)),
                 TableOperationType.Merge => TableOperation.Merge(AzureTableEntity.From(businessObject)),
-                TableOperationType.Replace => TableOperation.Replace(AzureTableEntity.From(businessObject)),
-                _ => null,
+                TableOperationType.Replace => TableOperation.Replace(AzureTableEntity.From(businessObject))
             };
+#pragma warning restore CS8509 // The switch expression does not handle all possible values of its input type (it is not exhaustive).
 
-            TableOperation operation = tableOperation;
             _queueOrder.Enqueue(_queueIndex);
-            
+
             _queue.TryAdd(_queueIndex++, new TableOperationWrapper(operation, AzureTablesDataSource.GetTableName<T>()));
             return _queueIndex;
         }
@@ -154,9 +155,9 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// <summary>
         /// Event handler for the _timer's Elapsed event
         /// </summary>
-        private void OnProcessQueueTimerElapsed(object _)
+        private void OnProcessQueueTimerElapsed(object? _)
         {
-            if (_isTimerRunning && (! _isDraining))
+            if (_isTimerRunning && (!_isDraining))
             {
                 return;
             }
@@ -171,7 +172,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
 
             while (_queueOrder.TryDequeue(out ulong queueID))
             {
-                if (!_queue.TryRemove(queueID, out TableOperationWrapper value))
+                if (!_queue.TryRemove(queueID, out TableOperationWrapper? value))
                 {
                     continue;
                 }

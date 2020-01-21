@@ -93,8 +93,9 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             string currentPartitionKey = Guid.NewGuid().ToString(); // nobody's partition key will ever be the same as this!
             TableBatchOperation batch = new TableBatchOperation();
 
-            foreach(T obj in listOfObjects)
+            foreach (T obj in listOfObjects)
             {
+#pragma warning disable CS8509 // The switch expression does not handle all possible values of its input type (it is not exhaustive).
                 TableOperation tableOperation = type switch
                 {
                     TableOperationType.Delete => TableOperation.Delete(AzureTableEntity.From(obj, forDelete: true)),
@@ -102,9 +103,9 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                     TableOperationType.InsertOrMerge => TableOperation.InsertOrMerge(AzureTableEntity.From(obj)),
                     TableOperationType.InsertOrReplace => TableOperation.InsertOrReplace(AzureTableEntity.From(obj)),
                     TableOperationType.Merge => TableOperation.Merge(AzureTableEntity.From(obj)),
-                    TableOperationType.Replace => TableOperation.Replace(AzureTableEntity.From(obj)),
-                    _ => null,
+                    TableOperationType.Replace => TableOperation.Replace(AzureTableEntity.From(obj))
                 };
+#pragma warning restore CS8509 // The switch expression does not handle all possible values of its input type (it is not exhaustive).
 
                 // all items in a batch must be the same partition key
                 // so if we hit a different one, we jump to a new batch
@@ -123,7 +124,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                             currentPartitionKey = tableOperation.Entity.PartitionKey;
                         }
                         break;
-                }                
+                }
 
                 batch.Add(tableOperation);
 
@@ -176,7 +177,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// <summary>
         /// Event handler for the _timer's Elapsed event
         /// </summary>
-        private void OnQueueProcessorTimerElapsed(object _)
+        private void OnQueueProcessorTimerElapsed(object? _)
         {
             if (_isTimerRunning && (!_isDraining))
             {
@@ -191,7 +192,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                 return;
             }
 
-            while (_queue.TryDequeue(out TableBatchOperationWrapper value))
+            while (_queue.TryDequeue(out TableBatchOperationWrapper? value))
             {
                 try
                 {

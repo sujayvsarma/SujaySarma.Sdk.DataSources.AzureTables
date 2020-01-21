@@ -32,7 +32,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             get;
             private set;
 
-        } = null;
+        }
 
         /// <summary>
         /// Storage account key
@@ -42,7 +42,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             get;
             private set;
 
-        } = null;
+        }
 
         /// <summary>
         /// Uri to the Table service (CosmosDB has the same scheme)
@@ -72,6 +72,9 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             }
 
             IsDevelopmentStorageAccount = connectionString.StartsWith(UseDevelopmentStorage);
+            AccountName = string.Empty;
+            AccountKey = string.Empty;
+
             if (IsDevelopmentStorageAccount)
             {
                 // we want to have things consistent below
@@ -106,6 +109,11 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             {
                 throw new ArgumentException();
             }
+
+            tableClient = new Microsoft.Azure.Cosmos.Table.CloudTableClient(
+                    TableUri,
+                    new Microsoft.Azure.Cosmos.Table.StorageCredentials(AccountName, AccountKey)
+                );
         }
 
         #endregion
@@ -118,14 +126,6 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// <returns>CloudTableClient</returns>
         public Microsoft.Azure.Cosmos.Table.CloudTableClient GetCloudTableClient()
         {
-            if (tableClient == null)
-            {
-                tableClient = new Microsoft.Azure.Cosmos.Table.CloudTableClient(
-                    TableUri,
-                    new Microsoft.Azure.Cosmos.Table.StorageCredentials(AccountName, AccountKey)
-                );
-            }
-
             return tableClient;
         }
 
@@ -140,7 +140,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         private const string DevelopmentStorageAccountName = "devstoreaccount1";
         private const string DevelopmentStorageAccountKey = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==";
 
-        private Microsoft.Azure.Cosmos.Table.CloudTableClient tableClient = null;
+        private readonly Microsoft.Azure.Cosmos.Table.CloudTableClient tableClient;
 
         #endregion
 

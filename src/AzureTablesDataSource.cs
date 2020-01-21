@@ -24,7 +24,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// <summary>
         /// Reference to the Azure Storage Account class
         /// </summary>
-        public AzureStorageAccount StorageAccount { get; private set; } = null;
+        public AzureStorageAccount StorageAccount { get; private set; }
 
         /// <summary>
         /// Name of the current table
@@ -55,7 +55,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
 
             _currentTableClient = StorageAccount.GetCloudTableClient();
             _currentTableReference = _currentTableClient.GetTableReference(tableName);
-            if (! _currentTableReference.Exists())
+            if (!_currentTableReference.Exists())
             {
                 _currentTableReference.Create();
             }
@@ -76,7 +76,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// <param name="isOrderByDescending">If true, performs a DESC sort by the <paramref name="orderByColumnName"/> column.</param>
         /// <param name="count">Number of results to return. Set zero or negative values to return all matches.</param>
         /// <returns>A lazily retrieved collection of business objects</returns>
-        public IEnumerable<T> Select<T>(string partitionKey = null, string rowKey = null, string otherFilters = null, IEnumerable<string> columnsList = null, string orderByColumnName = null, bool isOrderByDescending = false, int count = -1)
+        public IEnumerable<T> Select<T>(string? partitionKey = null, string? rowKey = null, string? otherFilters = null, IEnumerable<string>? columnsList = null, string? orderByColumnName = null, bool isOrderByDescending = false, int count = -1)
             where T : class, new()
         {
             StringBuilder query = new StringBuilder();
@@ -145,11 +145,85 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         }
 
         /// <summary>
+        /// Executes a SELECT command against the table. Returns only a single row.
+        /// </summary>
+        /// <typeparam name="T">Type of business object</typeparam>
+        /// <param name="partitionKey">Value of the partition key (optional)</param>
+        /// <param name="rowKey">Value of the row key (optional)</param>
+        /// <param name="otherFilters">Other filters to use (optional). This should not contain the partition and row key filters if those are already provided 
+        /// as the speciifc arguments (<paramref name="partitionKey"/> or <paramref name="rowKey"/>).</param>
+        /// <param name="columnsList">List of columns to return. Set NULL to return everything.</param>
+        /// <returns>A single object instance. NULL if there was no matching record</returns>
+        public T? SelectSingleObject<T>(string? partitionKey = null, string? rowKey = null, string? otherFilters = null, IEnumerable<string>? columnsList = null)
+            where T : class, new()
+        {
+            StringBuilder query = new StringBuilder();
+            query.Append("(IsDeleted eq false)");
+
+            if (!string.IsNullOrWhiteSpace(partitionKey))
+            {
+                query.Append($" and (PartitionKey eq '{partitionKey}')");
+            }
+
+            if (!string.IsNullOrWhiteSpace(rowKey))
+            {
+                query.Append($" and (RowKey eq '{rowKey}')");
+            }
+
+            if (!string.IsNullOrWhiteSpace(otherFilters))
+            {
+                query.Append($" and ({otherFilters})");
+            }
+
+            TableQuery<AzureTableEntity> tableQuery = (new TableQuery<AzureTableEntity>()).Where(query.ToString());
+
+            if (columnsList != null)
+            {
+                List<string> columnNamesToReturn = new List<string>();
+                foreach (string item in columnsList)
+                {
+                    if ((!string.IsNullOrWhiteSpace(item)) && (!columnNamesToReturn.Contains(item)))
+                    {
+                        columnNamesToReturn.Add(item);
+                    }
+                }
+
+                if (columnNamesToReturn.Count > 0)
+                {
+                    // Partition & Row key must always be selected, or we get weird results!
+
+                    if (!columnNamesToReturn.Contains("PartitionKey"))
+                    {
+                        columnNamesToReturn.Add("PartitionKey");
+                    }
+
+                    if (!columnNamesToReturn.Contains("RowKey"))
+                    {
+                        columnNamesToReturn.Add("RowKey");
+                    }
+
+                    tableQuery.Select(columnNamesToReturn);
+                }
+            }
+
+            // we want only the first element matching the stuff
+            tableQuery = tableQuery.Take(1);
+
+            IEnumerable<AzureTableEntity> returnedData = _currentTableReference.ExecuteQuery(tableQuery);
+            if (!returnedData.Any())
+            {
+                return null;
+            }
+
+            return returnedData.First().To<T>();
+        }
+
+        /// <summary>
         /// Inserts the provided objects into the table.
         /// </summary>
         /// <typeparam name="T">Type of business object</typeparam>
         /// <param name="objects">Collection of objects</param>
-        public ulong Insert<T>(IEnumerable<T> objects)
+        public ulong InsertList<T>(IEnumerable<T> objects)
             where T : class
         {
             if (objects != null)
@@ -195,7 +269,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// </summary>
         /// <typeparam name="T">Type of business object</typeparam>
         /// <param name="objects">Collection of objects</param>
-        public ulong Update<T>(IEnumerable<T> objects) where T : class => UpdateInternal(objects, false);
+        public ulong UpdateList<T>(IEnumerable<T> objects) where T : class => UpdateInternal(objects, false);
 
         /// <summary>
         /// Update the provided object into the table
@@ -254,13 +328,13 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// </summary>
         /// <typeparam name="T">Type of business object</typeparam>
         /// <param name="objects">Collection of objects</param>
-        public ulong Delete<T>(IEnumerable<T> objects)
+        public ulong DeleteList<T>(IEnumerable<T> objects)
             where T : class
         {
             if (objects != null)
             {
                 // we need to check if we are soft-deleting!
-                ClassInformation objectInfo = TypeInspector.InspectForAzureTables<T>();
+                ClassInformation? objectInfo = TypeInspector.InspectForAzureTables<T>();
                 if (objectInfo == null)
                 {
                     throw new TypeLoadException($"Type '{typeof(T).FullName}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute.");
@@ -300,7 +374,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             if (item != null)
             {
                 // we need to check if we are soft-deleting!
-                ClassInformation objectInfo = TypeInspector.InspectForAzureTables<T>();
+                ClassInformation? objectInfo = TypeInspector.InspectForAzureTables<T>();
                 if (objectInfo == null)
                 {
                     throw new TypeLoadException($"Type '{typeof(T).FullName}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute.");
@@ -335,7 +409,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// <param name="newCopy">The new data</param>
         /// <param name="originalPartitionKey">The partition key for the original object</param>
         /// <param name="originalRowKey">The row key for the original object</param>
-        public void ReplaceWith<T>(T newCopy, string originalPartitionKey = null, string originalRowKey = null)
+        public void ReplaceWith<T>(T newCopy, string? originalPartitionKey = null, string? originalRowKey = null)
             where T : class
         {
             if ((newCopy == null) || (string.IsNullOrWhiteSpace(originalPartitionKey) && string.IsNullOrWhiteSpace(originalRowKey)))
@@ -432,11 +506,13 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// <typeparam name="T">Class type of the business object</typeparam>
         /// <returns>Name of the table</returns>
         public static string GetTableName<T>() where T : class
+
+#pragma warning disable CS8604 // Possible null reference argument.
             => entityTableNames.GetOrAdd(
                     typeof(T).FullName,
                     (objectName) =>
                     {
-                        ClassInformation objectInfo = TypeInspector.InspectForAzureTables<T>();
+                        ClassInformation? objectInfo = TypeInspector.InspectForAzureTables<T>();
                         if (objectInfo == null)
                         {
                             throw new TypeLoadException($"Type '{typeof(T).FullName}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute.");
@@ -445,6 +521,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                         return objectInfo.TableAttribute.TableName;
                     }
                 );
+#pragma warning restore CS8604 // Possible null reference argument.
 
         #endregion
 
@@ -454,9 +531,6 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         {
             if (!alreadyDisposed)
             {
-                _currentTableReference = null;
-                _currentTableClient = null;
-
                 alreadyDisposed = true;
             }
         }
@@ -465,8 +539,8 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         #endregion
 
         private static readonly ConcurrentDictionary<string, string> entityTableNames = new ConcurrentDictionary<string, string>();
-        
-        private CloudTableClient _currentTableClient = null;
-        private CloudTable _currentTableReference = null;
+
+        private readonly CloudTableClient _currentTableClient;
+        private readonly CloudTable _currentTableReference;
     }
 }

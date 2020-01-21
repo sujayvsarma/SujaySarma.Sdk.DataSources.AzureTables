@@ -28,7 +28,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
         /// <typeparam name="ObjType">Data type of the object to read the field of</typeparam>
         /// <param name="obj">The object instance to read the value from</param>
         /// <returns>The value</returns>
-        public override object Read<ObjType>(ObjType obj)
+        public override object? Read<ObjType>(ObjType obj)
         {
             if (obj == null)
             {
@@ -44,7 +44,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
         /// <typeparam name="ObjType">Data type of the object to read the property or field of</typeparam>
         /// <param name="obj">The object instance to write the value to</param>
         /// <param name="value">Value to write out</param>
-        public override void Write<ObjType>(ObjType obj, object value)
+        public override void Write<ObjType>(ObjType obj, object? value)
         {
             if (obj == null)
             {
