@@ -1,5 +1,5 @@
 ﻿using Microsoft.Azure.Cosmos.Table;
-
+using Newtonsoft.Json;
 using SujaySarma.Sdk.DataSources.AzureTables.Attributes;
 using SujaySarma.Sdk.DataSources.AzureTables.EdmConverters;
 using SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector;
@@ -217,10 +217,20 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                 }
                 if ((!forDelete) && (member.TableEntityColumn != null))
                 {
-                    entity.AddOrUpdateProperty(
+                    if ((!member.IsEdmType) && member.TableEntityColumn.JsonSerialize)
+                    {
+                        entity.AddOrUpdateProperty(
+                                    member.TableEntityColumn.ColumnName,
+                                    JsonConvert.SerializeObject(member.Read(instance))
+                                );
+                    }
+                    else
+                    {
+                        entity.AddOrUpdateProperty(
                             member.TableEntityColumn.ColumnName,
                             GetAcceptableValue(member.Type, (member.IsEdmType ? member.Type : typeof(string)), member.Read(instance))
                         );
+                    }
                 }
 
                 if (forDelete && hasPartitionKey && hasRowKey)
@@ -320,11 +330,21 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
 
                         default:
                             object? value = GetPropertyValue(member.TableEntityColumn.ColumnName, default);
-                            member.Write(instance,
-                                    ((value == default) || (value == null))
-                                    ? default
-                                    : GetAcceptableValue(value.GetType(), member.Type, value)
-                                );
+                            if ((value == default) || (value == null))
+                            {
+                                member.Write(instance, default);
+                            }
+                            else
+                            {
+                                if ((value.GetType() == typeof(string)) && (member.Type != typeof(string)) && member.TableEntityColumn.JsonSerialize)
+                                {
+                                    member.Write(instance, JsonConvert.DeserializeObject((string)value, member.Type));
+                                }
+                                else
+                                {
+                                    member.Write(instance, GetAcceptableValue(value.GetType(), member.Type, value));
+                                }
+                            }
                             break;
                     }
                 }
@@ -389,11 +409,21 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
 
                                 default:
                                     object? value = tableEntity.GetPropertyValue(member.TableEntityColumn.ColumnName, default);
-                                    member.Write(instance,
-                                            ((value == default) || (value == null))
-                                            ? null
-                                            : GetAcceptableValue(value.GetType(), member.Type, value)
-                                        );
+                                    if ((value == default) || (value == null))
+                                    {
+                                        member.Write(instance, default);
+                                    }
+                                    else
+                                    {
+                                        if ((value.GetType() == typeof(string)) && (member.Type != typeof(string)) && member.TableEntityColumn.JsonSerialize)
+                                        {
+                                            member.Write(instance, JsonConvert.DeserializeObject((string)value, member.Type));
+                                        }
+                                        else
+                                        {
+                                            member.Write(instance, GetAcceptableValue(value.GetType(), member.Type, value));
+                                        }
+                                    }
                                     break;
                             }
                         }
