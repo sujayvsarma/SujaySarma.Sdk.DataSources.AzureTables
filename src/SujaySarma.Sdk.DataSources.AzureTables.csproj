@@ -10,15 +10,15 @@
     <Authors>Sujay V Sarma</Authors>
     <Company>Sujay V Sarma</Company>
     <Description>Easily add the ability to store data in Azure Storage's Table Service. Also works with CosmosDB when it is used in Tables API mode. Simply decorate your business objects and its properties with the provided attributes and store and retrieve data with Azure Table Storage using ONE line of code!</Description>
-    <Copyright>Copyright © 2019 Sujay V. Sarma. All Rights Reserved.</Copyright>
+    <Copyright>Copyright © 2020 Sujay V. Sarma. All Rights Reserved.</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/sujayvsarma/SujaySarma.Sdk.DataSources.AzureTables</PackageProjectUrl>
     <RepositoryUrl>https://github.com/sujayvsarma/SujaySarma.Sdk.DataSources.AzureTables</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>orm,data,azure,azure tables,cosmosdb,sql server</PackageTags>
-    <Version>4.0</Version>
-    <PackageReleaseNotes>Refactoring for C# 8.0 "nullable" syntax. Added some new APIs.</PackageReleaseNotes>
-    <AssemblyVersion>4.0.0.0</AssemblyVersion>
+    <Version>3.0</Version>
+    <PackageReleaseNotes>Library was refactored to comply with C# 8.0 "nullable" option. New APIs added to AzureTablesDataSource. Now, TableColumn attribute allows you to set "JsonSerialize" flag that will cause the property/field's data to be auto-serialized into a string column in the Table storage. We are using Newtonsoft.Json 12.0.3 for Json operations.</PackageReleaseNotes>
+    <AssemblyVersion>3.0.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
