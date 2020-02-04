@@ -99,13 +99,13 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                     continue;
                 }
 
-                if ((AccountName != null) && (AccountKey != null))
+                if ((!string.IsNullOrWhiteSpace(AccountName)) && (!string.IsNullOrWhiteSpace(AccountKey)))
                 {
                     break;
                 }
             }
 
-            if ((AccountName == null) || (AccountKey == null))
+            if (string.IsNullOrWhiteSpace(AccountName) || string.IsNullOrWhiteSpace(AccountKey))
             {
                 throw new ArgumentException();
             }
