@@ -33,6 +33,12 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.EdmConverters
         /// <returns>The converted value</returns>
         public static object? ConvertTo(Type destinationType, object value)
         {
+            // value is not null -- already been checked by caller before calling here
+            if (destinationType.IsEnum && (value is string))
+            {
+                return Enum.Parse(destinationType, (string)value);
+            }
+
             TypeConverter converter = TypeDescriptor.GetConverter(destinationType);
             if ((converter == null) || (!converter.CanConvertTo(destinationType)))
             {
