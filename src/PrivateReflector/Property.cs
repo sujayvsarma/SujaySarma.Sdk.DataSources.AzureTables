@@ -51,12 +51,12 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
                 throw new ArgumentNullException("Instance of object is NULL.");
             }
 
-            if (!CanRead)
+            if ((!CanRead) || (GetMethod == null))
             {
                 return null;
             }
 
-            return GetMethod?.Invoke(obj, FLAGS_READ_WRITE, null, null, null);
+            return GetMethod.Invoke(obj, FLAGS_READ_WRITE, null, null, null);
         }
 
         /// <summary>
@@ -72,9 +72,8 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
                 throw new ArgumentNullException("Instance of object is NULL.");
             }
 
-            if (SetMethod == null)
+            if ((!CanWrite) || (SetMethod == null))
             {
-                // property has no SET!
                 return;
             }
 
@@ -84,7 +83,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
                 return;
             }
 
-            SetMethod?.Invoke(obj, FLAGS_READ_WRITE, null, new object[] { value }, null);
+            SetMethod.Invoke(obj, FLAGS_READ_WRITE, null, new object[] { value }, null);
         }
     }
 }

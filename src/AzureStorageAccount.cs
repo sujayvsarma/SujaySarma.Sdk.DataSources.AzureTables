@@ -109,24 +109,6 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             {
                 throw new ArgumentException();
             }
-
-            tableClient = new Microsoft.Azure.Cosmos.Table.CloudTableClient(
-                    TableUri,
-                    new Microsoft.Azure.Cosmos.Table.StorageCredentials(AccountName, AccountKey)
-                );
-        }
-
-        #endregion
-
-        #region Methods
-
-        /// <summary>
-        /// Create/returns the table client
-        /// </summary>
-        /// <returns>CloudTableClient</returns>
-        public Microsoft.Azure.Cosmos.Table.CloudTableClient GetCloudTableClient()
-        {
-            return tableClient;
         }
 
         #endregion
@@ -139,8 +121,6 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         private const string HostnameDomainName = "core.windows.net";
         private const string DevelopmentStorageAccountName = "devstoreaccount1";
         private const string DevelopmentStorageAccountKey = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==";
-
-        private readonly Microsoft.Azure.Cosmos.Table.CloudTableClient tableClient;
 
         #endregion
 

@@ -53,7 +53,11 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             StorageAccount = new AzureStorageAccount(storageConnectionString);
             CurrentTableName = tableName;
 
-            _currentTableClient = StorageAccount.GetCloudTableClient();
+            _currentTableClient = new CloudTableClient(
+                    StorageAccount.TableUri,
+                    new StorageCredentials(StorageAccount.AccountName, StorageAccount.AccountKey)
+                );
+
             _currentTableReference = _currentTableClient.GetTableReference(tableName);
             if (!_currentTableReference.Exists())
             {

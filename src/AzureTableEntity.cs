@@ -1,5 +1,7 @@
 ﻿using Microsoft.Azure.Cosmos.Table;
+
 using Newtonsoft.Json;
+
 using SujaySarma.Sdk.DataSources.AzureTables.Attributes;
 using SujaySarma.Sdk.DataSources.AzureTables.EdmConverters;
 using SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector;
@@ -123,9 +125,9 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                 return null;
             }
 
-            if (value is EntityProperty)
+            if (value is EntityProperty property)
             {
-                return ((EntityProperty)value).PropertyAsObject;
+                return property.PropertyAsObject;
             }
 
             return value;
@@ -170,19 +172,13 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                 throw new TypeLoadException($"Type '{typeof(T).FullName}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute or has no properties/fields mapped to an Azure table.");
             }
 
-            bool hasPartitionKey = false, hasRowKey = false;
+            bool hasPartitionKey = false, hasRowKey = false, hasEtag = false;
             foreach (FieldOrPropertyBase member in objectInfo.FieldsOrProperties)
             {
-                object? value = null;
+                object? value = member.Read(instance);
 
                 if (member.IsPartitionKey)
                 {
-                    if (hasPartitionKey)
-                    {
-                        throw new TypeLoadException($"Object '{objectInfo.FullyQualifiedName}' contains multiple partition key definitions.");
-                    }
-
-                    value = member.Read(instance);
                     if (value == null)
                     {
                         throw new Exception("PartitionKey must be NON NULL.");
@@ -192,17 +188,12 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                     {
                         throw new InvalidOperationException("PartitionKey cannot be NULL.");
                     }
+
                     entity.PartitionKey = pk1;
                     hasPartitionKey = true;
                 }
                 if (member.IsRowKey)
                 {
-                    if (hasRowKey)
-                    {
-                        throw new TypeLoadException($"Object '{objectInfo.FullyQualifiedName}' contains multiple row key definitions.");
-                    }
-
-                    value = member.Read(instance);
                     if (value == null)
                     {
                         throw new Exception("RowKey must be NON NULL.");
@@ -210,32 +201,49 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
 
                     if (!(GetAcceptableValue(member.Type, typeof(string), value) is string rk1))
                     {
-                        throw new InvalidOperationException("PartitionKey cannot be NULL.");
+                        throw new InvalidOperationException("RowKey cannot be NULL.");
                     }
+
                     entity.RowKey = rk1;
                     hasRowKey = true;
                 }
+                if ((member.TableEntityColumn != null) && member.TableEntityColumn.ColumnName.Equals("ETag"))
+                {
+                    if (value == null)
+                    {
+                        value = "*";
+                    }
+
+                    if (!(GetAcceptableValue(member.Type, typeof(string), value) is string etag))
+                    {
+                        throw new InvalidOperationException("ETag cannot be NULL.");
+                    }
+
+                    entity.ETag = etag;
+                    hasEtag = true;
+                }
+
                 if ((!forDelete) && (member.TableEntityColumn != null))
                 {
                     if ((!member.IsEdmType) && member.TableEntityColumn.JsonSerialize)
                     {
                         entity.AddOrUpdateProperty(
                                     member.TableEntityColumn.ColumnName,
-                                    JsonConvert.SerializeObject(member.Read(instance))
+                                    JsonConvert.SerializeObject(value)
                                 );
                     }
                     else
                     {
                         entity.AddOrUpdateProperty(
                             member.TableEntityColumn.ColumnName,
-                            GetAcceptableValue(member.Type, (member.IsEdmType ? member.Type : typeof(string)), member.Read(instance))
+                            GetAcceptableValue(member.Type, (member.IsEdmType ? member.Type : typeof(string)), value)
                         );
                     }
                 }
 
-                if (forDelete && hasPartitionKey && hasRowKey)
+                if (forDelete && hasPartitionKey && hasRowKey && ((objectInfo.HasETag && hasEtag) || (!objectInfo.HasETag)))
                 {
-                    break;
+                    break;                    
                 }
             }
 
@@ -292,7 +300,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             ClassInformation? objectInfo = TypeInspector.InspectForAzureTables<T>();
             if (objectInfo == null)
             {
-                throw new TypeLoadException($"Type '{typeof(T).FullName}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute.");
+                throw new TypeLoadException($"Type '{typeof(T).Namespace}.{typeof(T).Name}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute.");
             }
 
             T instance = new T();
@@ -308,44 +316,33 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                     member.Write(instance, GetAcceptableValue(typeof(string), member.Type, RowKey));
                 }
 
+                if (member.IsETag)
+                {
+                    member.Write(instance, GetAcceptableValue(typeof(string), member.Type, ETag));
+                }
+
+                if (member.IsTimestamp)
+                {
+                    member.Write(instance, GetAcceptableValue(typeof(DateTimeOffset), member.Type, Timestamp));
+                }
+
                 if (member.TableEntityColumn != null)
                 {
-                    switch (member.TableEntityColumn.ColumnName)
+                    object? value = GetPropertyValue(member.TableEntityColumn.ColumnName, default);
+                    if ((value == default) || (value == null))
                     {
-                        case "ETag":
-                            member.Write(instance, GetAcceptableValue(typeof(string), member.Type, ETag));
-                            break;
-
-                        case "Timestamp":
-                            member.Write(instance, GetAcceptableValue(typeof(DateTimeOffset), member.Type, Timestamp));
-                            break;
-
-                        case "PartitionKey":
-                            member.Write(instance, GetAcceptableValue(typeof(string), member.Type, PartitionKey));
-                            break;
-
-                        case "RowKey":
-                            member.Write(instance, GetAcceptableValue(typeof(string), member.Type, RowKey));
-                            break;
-
-                        default:
-                            object? value = GetPropertyValue(member.TableEntityColumn.ColumnName, default);
-                            if ((value == default) || (value == null))
-                            {
-                                member.Write(instance, default);
-                            }
-                            else
-                            {
-                                if ((value.GetType() == typeof(string)) && (member.Type != typeof(string)) && member.TableEntityColumn.JsonSerialize)
-                                {
-                                    member.Write(instance, JsonConvert.DeserializeObject((string)value, member.Type));
-                                }
-                                else
-                                {
-                                    member.Write(instance, GetAcceptableValue(value.GetType(), member.Type, value));
-                                }
-                            }
-                            break;
+                        member.Write(instance, default);
+                    }
+                    else
+                    {
+                        if ((value.GetType() == typeof(string)) && (member.Type != typeof(string)) && member.TableEntityColumn.JsonSerialize)
+                        {
+                            member.Write(instance, JsonConvert.DeserializeObject((string)value, member.Type));
+                        }
+                        else
+                        {
+                            member.Write(instance, GetAcceptableValue(value.GetType(), member.Type, value));
+                        }
                     }
                 }
             }
@@ -365,7 +362,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             ClassInformation? objectInfo = TypeInspector.InspectForAzureTables<T>();
             if (objectInfo == null)
             {
-                throw new TypeLoadException($"Type '{typeof(T).FullName}' is not anotated with the '{typeof(TableAttribute).FullName}' attribute.");
+                throw new TypeLoadException($"Type '{typeof(T).Namespace}.{typeof(T).Name}' is not anotated with the '{typeof(TableAttribute).Namespace}.{typeof(TableAttribute).Name}' attribute.");
             }
 
             List<T> list = new List<T>();
@@ -387,44 +384,33 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                             member.Write(instance, GetAcceptableValue(typeof(string), member.Type, tableEntity.RowKey));
                         }
 
+                        if (member.IsETag)
+                        {
+                            member.Write(instance, GetAcceptableValue(typeof(string), member.Type, tableEntity.ETag));
+                        }
+
+                        if (member.IsTimestamp)
+                        {
+                            member.Write(instance, GetAcceptableValue(typeof(DateTimeOffset), member.Type, tableEntity.Timestamp));
+                        }
+
                         if (member.TableEntityColumn != null)
                         {
-                            switch (member.TableEntityColumn.ColumnName)
+                            object? value = tableEntity.GetPropertyValue(member.TableEntityColumn.ColumnName, default);
+                            if ((value == default) || (value == null))
                             {
-                                case "ETag":
-                                    member.Write(instance, GetAcceptableValue(typeof(string), member.Type, tableEntity.ETag));
-                                    break;
-
-                                case "Timestamp":
-                                    member.Write(instance, GetAcceptableValue(typeof(DateTimeOffset), member.Type, tableEntity.Timestamp));
-                                    break;
-
-                                case "PartitionKey":
-                                    member.Write(instance, GetAcceptableValue(typeof(string), member.Type, tableEntity.PartitionKey));
-                                    break;
-
-                                case "RowKey":
-                                    member.Write(instance, GetAcceptableValue(typeof(string), member.Type, tableEntity.RowKey));
-                                    break;
-
-                                default:
-                                    object? value = tableEntity.GetPropertyValue(member.TableEntityColumn.ColumnName, default);
-                                    if ((value == default) || (value == null))
-                                    {
-                                        member.Write(instance, default);
-                                    }
-                                    else
-                                    {
-                                        if ((value.GetType() == typeof(string)) && (member.Type != typeof(string)) && member.TableEntityColumn.JsonSerialize)
-                                        {
-                                            member.Write(instance, JsonConvert.DeserializeObject((string)value, member.Type));
-                                        }
-                                        else
-                                        {
-                                            member.Write(instance, GetAcceptableValue(value.GetType(), member.Type, value));
-                                        }
-                                    }
-                                    break;
+                                member.Write(instance, default);
+                            }
+                            else
+                            {
+                                if ((value.GetType() == typeof(string)) && (member.Type != typeof(string)) && member.TableEntityColumn.JsonSerialize)
+                                {
+                                    member.Write(instance, JsonConvert.DeserializeObject((string)value, member.Type));
+                                }
+                                else
+                                {
+                                    member.Write(instance, GetAcceptableValue(value.GetType(), member.Type, value));
+                                }
                             }
                         }
                     }
@@ -445,6 +431,10 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         {
             PartitionKey = entity.PartitionKey;
             RowKey = entity.RowKey;
+
+            // Should we copy Timestamp and Etag ???
+            //Timestamp = entity.Timestamp;
+            //ETag = entity.ETag;
 
             List<string> propertyNames = new List<string>();
             foreach (string key in _properties.Keys)

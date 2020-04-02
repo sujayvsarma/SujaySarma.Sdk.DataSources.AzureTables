@@ -23,6 +23,26 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
         public AzureTables.Attributes.TableAttribute TableAttribute { get; private set; }
 
         /// <summary>
+        /// Get/set if the class has a PartitionKey defined
+        /// </summary>
+        public bool HasPartitionKey { get; set; } = false;
+
+        /// <summary>
+        /// Get/set if the class has a RowKey defined
+        /// </summary>
+        public bool HasRowKey { get; set; } = false;
+
+        /// <summary>
+        /// Get/set if the class has a ETag property defined
+        /// </summary>
+        public bool HasETag { get; set; } = false;
+
+        /// <summary>
+        /// Get/set if the class has a Timestamp defined
+        /// </summary>
+        public bool HasTimestamp { get; set; } = false;
+
+        /// <summary>
         /// A readonly list of the properties
         /// </summary>
         public IReadOnlyList<Property> Properties { get; private set; }
@@ -46,7 +66,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
         /// <param name="properties">A readonly list of the properties in this object</param>
         /// <param name="fields">A readonly list of fields in this object</param>
         public ClassInformation(string localName, string fullName, AzureTables.Attributes.TableAttribute table,
-        IReadOnlyList<Property> properties, IReadOnlyList<Field> fields)
+                                    IReadOnlyList<Property> properties, IReadOnlyList<Field> fields)
         {
             ClassName = localName;
             FullyQualifiedName = fullName;

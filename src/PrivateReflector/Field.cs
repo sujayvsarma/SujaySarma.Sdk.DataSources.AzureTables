@@ -51,6 +51,11 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
                 throw new ArgumentNullException("Instance of object is NULL.");
             }
 
+            if (! CanWrite)
+            {
+                throw new InvalidOperationException($"Field '{MemberName}' in '{obj.GetType().FullName}' can only be instantiated in a class constructor.");
+            }
+
             if ((value == null) && (!IsNullableType))
             {
                 // Trying to set NULL into a non-Nullable type

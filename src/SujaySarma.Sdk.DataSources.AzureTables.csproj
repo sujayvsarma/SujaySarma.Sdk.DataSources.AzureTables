@@ -16,9 +16,9 @@
     <RepositoryUrl>https://github.com/sujayvsarma/SujaySarma.Sdk.DataSources.AzureTables</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>orm,data,azure,azure tables,cosmosdb,sql server</PackageTags>
-    <Version>3.1</Version>
-    <PackageReleaseNotes>**URGENT BUG FIX** Fixed a bug in the AzureTablesStorageAccount class that prevented non-DevStorage connection strings from being parsed correctly. Library was refactored to comply with C# 8.0 "nullable" option. New APIs added to AzureTablesDataSource. Now, TableColumn attribute allows you to set "JsonSerialize" flag that will cause the property/field's data to be auto-serialized into a string column in the Table storage. We are using Newtonsoft.Json 12.0.3 for Json operations.</PackageReleaseNotes>
-    <AssemblyVersion>3.1.0.0</AssemblyVersion>
+    <Version>3.5</Version>
+    <PackageReleaseNotes>Bug fixes and enhancements to code. OperationBatchQueue will now run in 30-second intervals. Added attributes for Etag and Timestamp (for class/table annotations), these will map to the Etag and Timestamp properties of the backing table respectively -- this lets us respect Etag values during Update/Delete operations.</PackageReleaseNotes>
+    <AssemblyVersion>3.5.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

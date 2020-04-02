@@ -52,6 +52,17 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
         public bool IsRowKey { get; set; } = false;
 
         /// <summary>
+        /// Maps to the TableEntity's ETag property
+        /// </summary>
+        public bool IsETag { get; set; } = false;
+
+        /// <summary>
+        /// Maps to the TableEntity's Timestamp property
+        /// </summary>
+        public bool IsTimestamp { get; set; } = false;
+
+
+        /// <summary>
         /// If mapped to a TableEntity's fields, reference to the TableColumnAttribute for that.
         /// (Could be NULL)
         /// </summary>
@@ -98,8 +109,39 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
                 {
                     IsRowKey = true;
                 }
+                else if (attribute is ETagAttribute)
+                {
+                    IsETag = true;
+                }
+                else if (attribute is TimestampAttribute)
+                {
+                    IsTimestamp = true;
+                }
                 else if (attribute is TableColumnAttribute tc)
                 {
+                    // Now the problem is legacy code that may define columns we now have attributes for 
+                    // as TableColumn() with matching names. So filter those out.
+
+                    switch (tc.ColumnName)
+                    {
+                        case "ETag":
+                            IsETag = true;
+                            continue;
+
+                        case "Timestamp":
+                            IsTimestamp = true;
+                            continue;
+
+                        case "PartitionKey":
+                            IsPartitionKey = true;
+                            continue;
+
+                        case "RowKey":
+                            IsRowKey = true;
+                            continue;
+                    }
+
+                    // Traditional column
                     TableEntityColumn = tc;
                 }
             }

@@ -20,16 +20,18 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// </summary>
         /// <param name="operation">TableOperation to queue</param>
         /// <param name="tableName">Name of the table to run it against</param>
-        /// <returns>QueueID. Use it to remove the item later (if required)</returns>
-        public ulong Add(TableOperation operation, string tableName)
+        public void Add(TableOperation operation, string tableName)
         {
             if (_isDraining)
             {
                 // no items can be added during a drain
                 throw new Exception("Cannot queue items during a drain.");
             }
-
-            if ((operation == null) || (operation.OperationType == TableOperationType.Invalid) || (operation.OperationType == TableOperationType.Retrieve))
+            if (operation == null)
+            {
+                throw new ArgumentNullException(nameof(operation));
+            }
+            if ((operation.OperationType == TableOperationType.Invalid) || (operation.OperationType == TableOperationType.Retrieve))
             {
                 throw new ArgumentOutOfRangeException("Unsupported operation for queue!");
             }
@@ -39,7 +41,6 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             }
 
             _queue.TryAdd(_queueIndex++, new TableOperationWrapper(operation, tableName));
-            return _queueIndex;
         }
 
         /// <summary>
@@ -48,8 +49,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// <typeparam name="T">Type of businessObject</typeparam>
         /// <param name="businessObject">Business object instance - cannot be NULL.</param>
         /// <param name="type">Type of TableOperation to generate</param>
-        /// <returns>QueueID. Use it to remove the item later (if required)</returns>
-        public ulong Add<T>(T businessObject, TableOperationType type) where T : class
+        public void Add<T>(T businessObject, TableOperationType type) where T : class
         {
             if (_isDraining)
             {
@@ -57,17 +57,11 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                 throw new Exception("Cannot queue items during a drain.");
             }
 
-            if ((type == TableOperationType.Invalid) || (type == TableOperationType.Retrieve))
-            {
-                throw new ArgumentOutOfRangeException("Unsupported operation for queue!");
-            }
-
             if (businessObject == null)
             {
                 throw new ArgumentNullException("businessObject");
             }
 
-#pragma warning disable CS8509 // The switch expression does not handle all possible values of its input type (it is not exhaustive).
             TableOperation operation = type switch
             {
                 TableOperationType.Delete => TableOperation.Delete(AzureTableEntity.From(businessObject, forDelete: true)),
@@ -75,31 +69,13 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                 TableOperationType.InsertOrMerge => TableOperation.InsertOrMerge(AzureTableEntity.From(businessObject)),
                 TableOperationType.InsertOrReplace => TableOperation.InsertOrReplace(AzureTableEntity.From(businessObject)),
                 TableOperationType.Merge => TableOperation.Merge(AzureTableEntity.From(businessObject)),
-                TableOperationType.Replace => TableOperation.Replace(AzureTableEntity.From(businessObject))
+                TableOperationType.Replace => TableOperation.Replace(AzureTableEntity.From(businessObject)),
+                _ => throw new ArgumentOutOfRangeException("Unsupported operation for queue!")
             };
-#pragma warning restore CS8509 // The switch expression does not handle all possible values of its input type (it is not exhaustive).
 
             _queueOrder.Enqueue(_queueIndex);
 
             _queue.TryAdd(_queueIndex++, new TableOperationWrapper(operation, AzureTablesDataSource.GetTableName<T>()));
-            return _queueIndex;
-        }
-
-        /// <summary>
-        /// Remove an operation from the queue (silent exit if operation is not in the queue/anymore).
-        /// </summary>
-        /// <param name="ID">QueueID returned by the Add() operation</param>
-        public void Remove(ulong ID)
-        {
-            if (_queue.ContainsKey(ID))
-            {
-                _queue.TryRemove(ID, out TableOperationWrapper _);
-            }
-
-            //NOTE: The QueueID still remains in the _queueOrder queue. We cannot remove it 
-            //      from there, because that is a queue and we have to dequeue/requeue all other 
-            //      items from in it... very messy. So just leave it in there.
-            //      In any case, the OnFetchTimerElapsed's loop handles missing QueueIDs :-)
         }
 
         /// <summary>
@@ -223,6 +199,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             _queueIndex = ulong.Parse(utcNow.ToString("yyyyMMddHHmmss")) + Convert.ToUInt64(utcNow.Ticks);
         }
 
+
         /// <summary>
         /// Instantiate the queue
         /// </summary>
@@ -230,6 +207,14 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         public OperationQueue(string connectionString)
         {
             tableClient = CloudStorageAccount.Parse(connectionString).CreateCloudTableClient();
+            ResetQueueIndex();
+            _processQueueTimer = new Timer(OnProcessQueueTimerElapsed, null, __TIMER_PERIOD, -1);
+        }
+
+
+        public OperationQueue(AzureStorageAccount azureStorageAccount)
+        {
+            tableClient = new CloudTableClient(azureStorageAccount.TableUri, new StorageCredentials(azureStorageAccount.AccountName, azureStorageAccount.AccountKey));
             ResetQueueIndex();
             _processQueueTimer = new Timer(OnProcessQueueTimerElapsed, null, __TIMER_PERIOD, -1);
         }

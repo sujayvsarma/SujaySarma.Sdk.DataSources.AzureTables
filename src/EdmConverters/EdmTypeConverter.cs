@@ -33,13 +33,19 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.EdmConverters
         /// <returns>The converted value</returns>
         public static object? ConvertTo(Type destinationType, object value)
         {
-            // value is not null -- already been checked by caller before calling here
-            if (destinationType.IsEnum && (value is string))
+            //NOTE: value is not null -- already been checked by caller before calling here
+
+            if (destinationType.IsEnum && (value is string val))
             {
-                return Enum.Parse(destinationType, (string)value);
+                // Input is a string, destination is an Enum, Enum.Parse() it to convert!
+                // We are using Parse() and not TryParse() with good reason. Bad values will throw exceptions to the top-level caller 
+                // and we WANT that to happen!
+
+                return Enum.Parse(destinationType, val);
             }
 
             TypeConverter converter = TypeDescriptor.GetConverter(destinationType);
+
             if ((converter == null) || (!converter.CanConvertTo(destinationType)))
             {
                 // see if type has a Parse static method
@@ -57,8 +63,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.EdmConverters
                                 return m.Invoke(null, new object?[] { value });
                             }
                         }
-
-                        if (m.Name.Equals("TryParse"))
+                        else if (m.Name.Equals("TryParse"))
                         {
                             ParameterInfo? p = m.GetParameters()?[0];
                             if ((p != null) && (p.ParameterType == sourceType))

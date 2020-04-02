@@ -19,15 +19,14 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
         public static ClassInformation? InspectForAzureTables<ClassT>()
             where ClassT : class
         {
-#pragma warning disable CS8604 // Possible null reference argument.
             Type classType = typeof(ClassT);
-            ClassInformation? objectMetadata = Cache.TryGet(classType.FullName);
+            string cacheKeyName = classType.FullName ?? classType.Name;
+            ClassInformation? objectMetadata = Cache.TryGet(cacheKeyName);
             if (objectMetadata != null)
             {
                 // cache hit
                 return objectMetadata;
             }
-#pragma warning restore CS8604 // Possible null reference argument.
 
             TableAttribute? tableAttribute = classType.GetCustomAttribute<TableAttribute>(true);
             if (tableAttribute == null)
@@ -37,6 +36,9 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
 
             List<Property> properties = new List<Property>();
             List<Field> fields = new List<Field>();
+
+            bool hasPartitionKey = false, hasRowKey = false, hasETag = false, hasTimestamp = false;
+
             foreach (MemberInfo member in classType.GetMembers(MEMBER_SEARCH_FLAGS))
             {
                 object[] memberAttributes = member.GetCustomAttributes(true);
@@ -45,17 +47,46 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
                     continue;
                 }
 
-                bool hasAttribute = false;
                 foreach (object attribute in memberAttributes)
                 {
-                    if ((attribute is PartitionKeyAttribute) || (attribute is RowKeyAttribute) || (attribute is TableColumnAttribute))
+                    if (attribute is ETagAttribute)
                     {
-                        hasAttribute = true;
-                        break;
+                        if (hasETag)
+                        {
+                            throw new InvalidOperationException($"'{cacheKeyName}' has multiple ETag properties defined.");
+                        }
+
+                        hasETag = true;
+                    }
+
+                    if (attribute is PartitionKeyAttribute)
+                    {
+                        if (hasPartitionKey)
+                        {
+                            throw new InvalidOperationException($"'{cacheKeyName}' has multiple PartitionKey properties defined.");
+                        }
+
+                        hasPartitionKey = true;
+                    }
+
+                    if (attribute is RowKeyAttribute)
+                    {
+                        if (hasRowKey)
+                        {
+                            throw new InvalidOperationException($"'{cacheKeyName}' has multiple RowKey properties defined.");
+                        }
+
+                        hasRowKey = true;
+                    }
+
+                    if (attribute is TimestampAttribute)
+                    {
+                        // since we never read this back into the TableEntity, there can be as many of these as the developer wants :)
+                        hasTimestamp = true;
                     }
                 }
 
-                if (!hasAttribute)
+                if (!(hasPartitionKey || hasRowKey))
                 {
                     continue;
                 }
@@ -80,15 +111,23 @@ namespace SujaySarma.Sdk.DataSources.AzureTables.PrivateReflector
                 }
             }
 
-            if ((properties.Count == 0) && (fields.Count == 0))
+            if ((properties.Count == 0) && (fields.Count == 0) || (! hasPartitionKey) || (! hasRowKey))
             {
                 return null;
             }
 
-#pragma warning disable CS8604 // Possible null reference argument.
-            objectMetadata = new ClassInformation(classType.Name, classType.FullName, tableAttribute, properties, fields);
-            Cache.TrySet(objectMetadata, classType.FullName);
-#pragma warning restore CS8604 // Possible null reference argument.
+            objectMetadata = new ClassInformation(classType.Name, cacheKeyName, tableAttribute, properties, fields)
+            {
+                // without these two, we don't get here!
+                HasPartitionKey = true,
+                HasRowKey = true,
+
+                HasETag = hasETag,
+                HasTimestamp = hasTimestamp
+            };
+
+
+            Cache.TrySet(objectMetadata, cacheKeyName);
 
             return objectMetadata;
         }
