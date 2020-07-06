@@ -23,6 +23,12 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// <param name="tableName">Name of the table to run it against</param>
         public void Add(TableBatchOperation batch, string tableName)
         {
+            if (_isDraining)
+            {
+                // no items can be added during a drain
+                throw new Exception("Cannot queue items during a drain.");
+            }
+
             if ((batch == null) || (batch.Count == 0))
             {
                 throw new ArgumentNullException("Empty batch");
@@ -74,7 +80,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
                     }
                 }
             }
-            
+
         }
 
         /// <summary>
@@ -85,17 +91,23 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// <param name="type">Type of TableBatchOperation to generate</param>
         public void Add<T>(IEnumerable<T> listOfObjects, TableOperationType type) where T : class
         {
+            if (_isDraining)
+            {
+                // no items can be added during a drain
+                throw new Exception("Cannot queue items during a drain.");
+            }
+
+            if (listOfObjects == null)
+            {
+                throw new ArgumentNullException(nameof(listOfObjects));
+            }
+
             int t = (int)type;
 
             // these are the int values of the range of operation types supported
             if ((t < 0) || (t > 5))
             {
                 throw new ArgumentOutOfRangeException("Unsupported operation for queue!");
-            }
-
-            if (listOfObjects == null)
-            {
-                throw new ArgumentNullException(nameof(listOfObjects));
             }
 
             string currentPartitionKey = Guid.NewGuid().ToString(); // nobody's partition key will ever be the same as this!
@@ -220,81 +232,72 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
 
             _isTimerRunning = true;
 
-            if (_queue.Count == 0)
+            if (_queue.Count > 0)
             {
-                ResetTimer();
-                return;
-            }
+                int counter = 0, total = _queue.Count;
 
-            int counter = 0, total = _queue.Count;
+                Stopwatch sw = new Stopwatch();
+                sw.Start();
 
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
-
-            while ((sw.ElapsedMilliseconds < __TIMER_RUN_TIME) && _queue.TryDequeue(out TableBatchOperationWrapper? value))
-            {
-                try
+                while ((sw.ElapsedMilliseconds < __TIMER_RUN_TIME) && _queue.TryDequeue(out TableBatchOperationWrapper? value))
                 {
-                    if (!tables.ContainsKey(value.TableName))
+                    string tableName = value.TableName;
+
+                    try
                     {
-                        CloudTable tableReference = tableClient.GetTableReference(value.TableName);
-                        if (!tableReference.Exists())
+                        if (!tables.ContainsKey(tableName))
                         {
-                            tableReference.Create();
+                            CloudTable tableReference = tableClient.GetTableReference(tableName);
+                            if (!tableReference.Exists())
+                            {
+                                tableReference.Create();
+                            }
+                            tables.Add(tableName, tableReference);
                         }
-                        tables.Add(value.TableName, tableReference);
+
+                        tables[tableName].ExecuteBatch(value.Batch);
+
+                        TableOperation op = value.Batch[0];
+                        Progress?.Invoke(++counter, total, tableName, Enum.GetName(typeof(TableOperationType), op.OperationType) ?? "Unknown", op.Entity.PartitionKey, op.Entity.RowKey);
                     }
-
-                    counter++;
-                    
-                    tables[value.TableName].ExecuteBatch(value.Batch);
-
-                    TableOperation op = value.Batch[0];
-                    Progress?.Invoke(counter, total, value.TableName, Enum.GetName(typeof(TableOperationType), op.OperationType) ?? "Unknown", op.Entity.PartitionKey, op.Entity.RowKey);
-                }
-                catch (Exception ex)
-                {
-                    Error?.Invoke(ex.Message, ex);
+                    catch (Exception ex)
+                    {
+                        Error?.Invoke(ex.Message, ex);
 
 #if TRACE
-                    Trace.WriteLine($"[OperationBatchQueue]: Table name: {value.TableName}\r\nException: {ex.Message}.");
+                        Trace.WriteLine($"[OperationBatchQueue]: Table name: {tableName}\r\nException: {ex.Message}.");
 #endif
 
-                    // eat the exception, we dont want to miss our next timer 
-                    // because of improper operations in the queue!
+                        // eat the exception, we dont want to miss our next timer 
+                        // because of improper operations in the queue!
+                    }
                 }
+
+                sw.Stop();
             }
 
-            sw.Stop();
-            ResetTimer();
-        }
-
-        /// <summary>
-        /// Resets the timer to wait another __TIMER_PERIOD milliseconds
-        /// </summary>
-        private void ResetTimer()
-        {
-            if (!_isDraining)
-            {
-                _timer.Change(__TIMER_PERIOD, -1);
-                _isTimerRunning = false;
-            }
+            _isTimerRunning = false;
+            _timer.Change(__TIMER_PERIOD, Timeout.Infinite);
         }
 
         /// <summary>
         /// Instantiate the queue
         /// </summary>
         /// <param name="connectionString">Connection string to the table storage</param>
-        public OperationBatchQueue(string connectionString)
+        /// <param name="queueFlushInterval">Interval time in milliseconds between queue flushes (for eg: '1000' means the queue will be flushed once a second). 
+        /// Set longer values for queues that do not see much CRUD operations.</param>
+        public OperationBatchQueue(string connectionString, int queueFlushInterval = 1000)
         {
             tableClient = CloudStorageAccount.Parse(connectionString).CreateCloudTableClient();
-            _timer = new Timer(OnQueueProcessorTimerElapsed, null, __TIMER_PERIOD, -1);
+
+            __TIMER_PERIOD = queueFlushInterval;
+            _timer = new Timer(OnQueueProcessorTimerElapsed, null, __TIMER_PERIOD, Timeout.Infinite);
         }
 
         private readonly CloudTableClient tableClient;
         private readonly ConcurrentQueue<TableBatchOperationWrapper> _queue = new ConcurrentQueue<TableBatchOperationWrapper>();
         private readonly Timer _timer;
-        private readonly int __TIMER_PERIOD = 5000, __MAX_ITEMS_PER_BATCH = 100, __TIMER_RUN_TIME = 30000;
+        private readonly int __TIMER_PERIOD = 1000, __MAX_ITEMS_PER_BATCH = 100, __TIMER_RUN_TIME = 30000;
         private readonly Dictionary<string, CloudTable> tables = new Dictionary<string, CloudTable>();
 
         private bool _isTimerRunning = false, _isDraining = false;

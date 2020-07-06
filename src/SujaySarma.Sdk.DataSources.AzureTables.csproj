@@ -16,9 +16,9 @@
     <RepositoryUrl>https://github.com/sujayvsarma/SujaySarma.Sdk.DataSources.AzureTables</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>orm,data,azure,azure tables,cosmosdb,sql server</PackageTags>
-    <Version>3.5</Version>
-    <PackageReleaseNotes>Bug fixes and enhancements to code. OperationBatchQueue will now run in 30-second intervals. Added attributes for Etag and Timestamp (for class/table annotations), these will map to the Etag and Timestamp properties of the backing table respectively -- this lets us respect Etag values during Update/Delete operations.</PackageReleaseNotes>
-    <AssemblyVersion>3.5.0.0</AssemblyVersion>
+    <Version>3.6</Version>
+    <PackageReleaseNotes>Bug fixes and enhancements to code. OperationBatchQueue will now run in configurable intervals. Added attributes for Etag and Timestamp (for class/table annotations), these will map to the Etag and Timestamp properties of the backing table respectively -- this lets us respect Etag values during Update/Delete operations.</PackageReleaseNotes>
+    <AssemblyVersion>3.6.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

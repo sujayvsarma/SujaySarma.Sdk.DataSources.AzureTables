@@ -204,18 +204,29 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// Instantiate the queue
         /// </summary>
         /// <param name="connectionString">Connection string to the table storage</param>
-        public OperationQueue(string connectionString)
+        /// <param name="queueFlushInterval">Interval time in milliseconds between queue flushes (for eg: '1000' means the queue will be flushed once a second). 
+        /// Set longer values for queues that do not see much CRUD operations.</param>
+        public OperationQueue(string connectionString, int queueFlushInterval = 1000)
         {
             tableClient = CloudStorageAccount.Parse(connectionString).CreateCloudTableClient();
             ResetQueueIndex();
+
+            __TIMER_PERIOD = queueFlushInterval;
             _processQueueTimer = new Timer(OnProcessQueueTimerElapsed, null, __TIMER_PERIOD, -1);
         }
 
-
-        public OperationQueue(AzureStorageAccount azureStorageAccount)
+        /// <summary>
+        /// Instantiate the queue
+        /// </summary>
+        /// <param name="azureStorageAccount"></param>
+        /// <param name="queueFlushInterval">Interval time in milliseconds between queue flushes (for eg: '1000' means the queue will be flushed once a second). 
+        /// Set longer values for queues that do not see much CRUD operations.</param>
+        public OperationQueue(AzureStorageAccount azureStorageAccount, int queueFlushInterval = 1000)
         {
             tableClient = new CloudTableClient(azureStorageAccount.TableUri, new StorageCredentials(azureStorageAccount.AccountName, azureStorageAccount.AccountKey));
             ResetQueueIndex();
+
+            __TIMER_PERIOD = queueFlushInterval;
             _processQueueTimer = new Timer(OnProcessQueueTimerElapsed, null, __TIMER_PERIOD, -1);
         }
 
@@ -223,7 +234,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         private readonly ConcurrentDictionary<ulong, TableOperationWrapper> _queue = new ConcurrentDictionary<ulong, TableOperationWrapper>();
         private readonly Queue<ulong> _queueOrder = new Queue<ulong>();
         private readonly Timer _processQueueTimer;
-        private readonly int __TIMER_PERIOD = 5000;
+        private readonly int __TIMER_PERIOD = 1000;
         private readonly Dictionary<string, CloudTable> tables = new Dictionary<string, CloudTable>();
 
         private ulong _queueIndex;
