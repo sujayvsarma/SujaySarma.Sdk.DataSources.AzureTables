@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net5.0</TargetFramework>
     <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);CopyProjectReferencesToPackage</TargetsForTfmSpecificBuildOutput>
     <nullable>enable</nullable>
     <LangVersion>8.0</LangVersion>
@@ -10,15 +10,15 @@
     <Authors>Sujay V Sarma</Authors>
     <Company>Sujay V Sarma</Company>
     <Description>Easily add the ability to store data in Azure Storage's Table Service. Also works with CosmosDB when it is used in Tables API mode. Simply decorate your business objects and its properties with the provided attributes and store and retrieve data with Azure Table Storage using ONE line of code!</Description>
-    <Copyright>Copyright © 2020 Sujay V. Sarma. All Rights Reserved.</Copyright>
+    <Copyright>Copyright © 2021 Sujay V. Sarma. All Rights Reserved.</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/sujayvsarma/SujaySarma.Sdk.DataSources.AzureTables</PackageProjectUrl>
     <RepositoryUrl>https://github.com/sujayvsarma/SujaySarma.Sdk.DataSources.AzureTables</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>orm,data,azure,azure tables,cosmosdb,sql server</PackageTags>
-    <Version>3.6</Version>
-    <PackageReleaseNotes>Bug fixes and enhancements to code. OperationBatchQueue will now run in configurable intervals. Added attributes for Etag and Timestamp (for class/table annotations), these will map to the Etag and Timestamp properties of the backing table respectively -- this lets us respect Etag values during Update/Delete operations.</PackageReleaseNotes>
-    <AssemblyVersion>3.6.0.0</AssemblyVersion>
+    <Version>4.0</Version>
+    <PackageReleaseNotes>This is identical to v3.6, but this version is meant for .NET 5.0 consumer apps.</PackageReleaseNotes>
+    <AssemblyVersion>4.0.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

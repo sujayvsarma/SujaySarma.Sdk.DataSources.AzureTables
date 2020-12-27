@@ -435,8 +435,8 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             }
 
             TableQuery<AzureTableEntity> tableQuery = (new TableQuery<AzureTableEntity>()).Where(query.ToString());
-            AzureTableEntity originalEntity = _currentTableReference.ExecuteQuery(tableQuery).FirstOrDefault();
-            if (originalRowKey == default)
+            AzureTableEntity? originalEntity = _currentTableReference.ExecuteQuery(tableQuery).FirstOrDefault();
+            if ((originalEntity == default) || (originalRowKey == default))
             {
                 Insert(new T[] { newCopy });
                 return;
