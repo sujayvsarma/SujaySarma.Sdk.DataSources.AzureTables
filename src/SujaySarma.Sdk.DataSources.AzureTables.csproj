@@ -17,8 +17,11 @@
     <RepositoryType>Git</RepositoryType>
     <PackageTags>orm,data,azure,azure tables,cosmosdb,sql server</PackageTags>
     <Version>4.0</Version>
-    <PackageReleaseNotes>This is identical to v3.6, but this version is meant for .NET 5.0 consumer apps.</PackageReleaseNotes>
-    <AssemblyVersion>4.0.0.0</AssemblyVersion>
+    <PackageReleaseNotes>Package contains libraries for .NET Core 3.1 and .NET 5.0. For .NET 5.0 the upstream Cosmos libraries used are the .NETStandard 2.0 ones. 
+
+v4.5 adds support to query tables that have no "IsDeleted" column. In previous versions, querying these tables would result in an empty data result because this SDK had no way to figure out if the target table had this field before sending the query. Yes, essentially, this is a "bug" fix, but I am calling it a new feature because now you can use this SDK to query any Azure Storage table or Cosmos DB table over the Tables API.</PackageReleaseNotes>
+    <AssemblyVersion>4.5.0.0</AssemblyVersion>
+    <FileVersion>4.5.0.0</FileVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -53,7 +56,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Azure.Cosmos.Table" Version="[2.0.0-preview, )" />
+    <PackageReference Include="Microsoft.Azure.Cosmos.Table" Version="1.0.8" />
   </ItemGroup>
 
   <Target Name="CopyProjectReferencesToPackage" DependsOnTargets="ResolveReferences">

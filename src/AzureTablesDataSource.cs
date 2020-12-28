@@ -31,6 +31,12 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// </summary>
         public string CurrentTableName { get; private set; }
 
+        /// <summary>
+        /// Set this to FALSE to indicate that this table does NOT have an IsDeleted column. 
+        /// If this is set and the table does not have the field, then SELECT queries will FAIL.
+        /// </summary>
+        public bool UsesIsDeleted { get; private set; } = true;
+
         #endregion
 
         /// <summary>
@@ -38,7 +44,8 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
         /// </summary>
         /// <param name="storageConnectionString">Storage connection string</param>
         /// <param name="tableName">Name of the table to connect to</param>
-        public AzureTablesDataSource(string storageConnectionString, string tableName)
+        /// <param name="usesIsDeleted">Set to FALSE for tables that do not have an IsDeleted field (i.e., external tables not created by this SDK)</param>
+        public AzureTablesDataSource(string storageConnectionString, string tableName, bool usesIsDeleted = true)
         {
             if (string.IsNullOrWhiteSpace(storageConnectionString))
             {
@@ -52,6 +59,7 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
 
             StorageAccount = new AzureStorageAccount(storageConnectionString);
             CurrentTableName = tableName;
+            UsesIsDeleted = usesIsDeleted;
 
             _currentTableClient = new CloudTableClient(
                     StorageAccount.TableUri,
@@ -84,7 +92,10 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             where T : class, new()
         {
             StringBuilder query = new StringBuilder();
-            query.Append("(IsDeleted eq false)");
+            if (UsesIsDeleted)
+            {
+                query.Append("(IsDeleted eq false)");
+            }
 
             if (!string.IsNullOrWhiteSpace(partitionKey))
             {
@@ -162,7 +173,10 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             where T : class, new()
         {
             StringBuilder query = new StringBuilder();
-            query.Append("(IsDeleted eq false)");
+            if (UsesIsDeleted)
+            {
+                query.Append("(IsDeleted eq false)");
+            }
 
             if (!string.IsNullOrWhiteSpace(partitionKey))
             {
@@ -422,7 +436,10 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
             }
 
             StringBuilder query = new StringBuilder();
-            query.Append("(IsDeleted eq false)");
+            if (UsesIsDeleted)
+            {
+                query.Append("(IsDeleted eq false)");
+            }
 
             if (!string.IsNullOrWhiteSpace(originalPartitionKey))
             {
