@@ -99,17 +99,29 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
 
             if (!string.IsNullOrWhiteSpace(partitionKey))
             {
-                query.Append($" and (PartitionKey eq '{partitionKey}')");
+                if (query.Length > 0)
+                {
+                    query.Append(" and ");
+                }
+                query.Append($"(PartitionKey eq '{partitionKey}')");
             }
 
             if (!string.IsNullOrWhiteSpace(rowKey))
             {
-                query.Append($" and (RowKey eq '{rowKey}')");
+                if (query.Length > 0)
+                {
+                    query.Append(" and ");
+                }
+                query.Append($"(RowKey eq '{rowKey}')");
             }
 
             if (!string.IsNullOrWhiteSpace(otherFilters))
             {
-                query.Append($" and ({otherFilters})");
+                if (query.Length > 0)
+                {
+                    query.Append(" and ");
+                }
+                query.Append($"({otherFilters})");
             }
 
             TableQuery<AzureTableEntity> tableQuery = (new TableQuery<AzureTableEntity>()).Where(query.ToString());
@@ -180,17 +192,29 @@ namespace SujaySarma.Sdk.DataSources.AzureTables
 
             if (!string.IsNullOrWhiteSpace(partitionKey))
             {
-                query.Append($" and (PartitionKey eq '{partitionKey}')");
+                if (query.Length > 0)
+                {
+                    query.Append(" and ");
+                }
+                query.Append($"(PartitionKey eq '{partitionKey}')");
             }
 
             if (!string.IsNullOrWhiteSpace(rowKey))
             {
-                query.Append($" and (RowKey eq '{rowKey}')");
+                if (query.Length > 0)
+                {
+                    query.Append(" and ");
+                }
+                query.Append($"(RowKey eq '{rowKey}')");
             }
 
             if (!string.IsNullOrWhiteSpace(otherFilters))
             {
-                query.Append($" and ({otherFilters})");
+                if (query.Length > 0)
+                {
+                    query.Append(" and ");
+                }
+                query.Append($"({otherFilters})");
             }
 
             TableQuery<AzureTableEntity> tableQuery = (new TableQuery<AzureTableEntity>()).Where(query.ToString());
