@@ -1,7 +1,18 @@
 # SujaySarma.Sdk.DataSources.AzureTables
-The revamped SujaySarma.Sdk.DataSources.AzureTables library. We now use the SujaySarma.Sdk.Core as a submodule, this cleans up dependencies and also allows for a cleaner build and CI experience.
+The revamped SujaySarma.Sdk.DataSources.AzureTables library. 
 
-**NOTE:** Because there is no SujaySarma.Sdk.ObjectMapper library, we have one less dependency and only depend on the SujaySarma.Sdk.Core library!
+## Dependencies
+Other libraries: `Microsoft.Azure.Cosmos.Table` version 1.0.8+
+
+## Compatibility
+
+.Net Version|Compat
+------------|---------
+.Net Framework|[ ] No
+.Net Core|[X] .Net Core 3.1
+.Net 5.0|[X] Library builds on 5.0
+.Net Standard|[X] .Net Standard 2.0
+
 
 ## Json Serialization
 This package uses a mix of `System.Text.Json` (.NET Core 3.0) and the `Newtonsoft.Json` libraries. This is because there is atleast ONE place in code where the Newtonsoft library is more reliable than the .NET Core library. When and if this changes, we will move to a single consolidated parser.
